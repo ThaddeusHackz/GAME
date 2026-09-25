@@ -1,0 +1,43 @@
+# ══ DIVIDED HORIZON — ignore rules ════════════════════════════════════════
+# Everything below is *regenerable*: compiled binaries, build intermediates,
+# screenshots, and local save data. Nothing here is source of truth, and
+# shipping any of it in git would bloat the repo and the dist zip
+# (Spec 9: honest file sizes, no padding).
+
+# build outputs (unanchored: game/build/ from the smoke test is ignored too)
+build/
+dist/
+*.o
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# local runtime state (saves NEVER live in the install dir — Spec 6.11,
+# but a developer's machine may still produce these next to the repo)
+saves/
+user/
+crash-log*.txt
+feedback.json
+settings.json
+save_*.json
+
+# screenshots / capture output
+shots/
+*.bmp
+*.png
+!game/assets/**/*.png
+
+# toolchain caches
+.cache/
+.local/
+node_modules/
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
