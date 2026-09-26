@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 
 typedef struct { float m[9]; } Mat3;   /* row-major 3x3 for normals */
 
@@ -293,7 +294,14 @@ static void draw_mesh_item(const RenderItem *it) {
     const Mesh *m = mesh_get(it->mesh);
     if (!m || !m->pos || !m->idx || m->icount < 3) return;
     s_model = it->model;
-    s_mvp = m4_mul(s_proj, m4_mul(s_view, s_model));
+    /* BUG FIXED (M1, found by invisible graybox props): project_sv() consumes
+       WORLD-space vertices, and p0/p1/p2 below are already model-transformed.
+       Folding s_model into s_mvp as well applied the model TWICE, so every
+       non-identity-model mesh (all props, vehicles, characters) projected
+       to nonsense clip coordinates and painted zero pixels, while
+       identity-model terrain looked perfectly fine. The lines/particles
+       paths already got this right — the mesh path did not. */
+    s_mvp = m4_mul(s_proj, s_view);
     s_nmat = mat3_normal_from(s_model);
 
     Vec3 wc = m4_xform_p(s_model, m->center);

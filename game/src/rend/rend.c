@@ -70,11 +70,21 @@ void tex_build_mips(Texture *t) {
     t->mip[0] = t->px; t->mipw[0] = t->w; t->miph[0] = t->h;
     for (int l = 1; l < TEX_MIP_LEVELS; l++) {
         int pw = t->mipw[l-1], ph = t->miph[l-1];
-        int w = pw > 1 ? pw >> 1 : 1, h = ph > 1 ? ph >> 1 : 1;
-        if (w == pw && h == ph) { t->mip[l] = NULL; continue; }
-        uint32_t *dst = (uint32_t*)malloc((size_t)w * h * 4);
-        if (!dst) { t->mip[l] = NULL; continue; }
         const uint32_t *src = t->mip[l-1];
+        /* BUG FIXED (found by the 4x4 "white" texture): once a level stops
+           shrinking we set mip[l] = NULL, but mipw/miph stayed 0, so the NEXT
+           level computed w=h=1, saw "1 != 0", allocated a destination and then
+           read from a NULL src — instant segfault on any texture smaller than
+           2^TEX_MIP_LEVELS. Carry the parent's dims forward and bail on NULL. */
+        if (!src || pw < 1 || ph < 1) {
+            t->mip[l] = NULL; t->mipw[l] = pw; t->miph[l] = ph; continue;
+        }
+        int w = pw > 1 ? pw >> 1 : 1, h = ph > 1 ? ph >> 1 : 1;
+        if (w == pw && h == ph) {
+            t->mip[l] = NULL; t->mipw[l] = pw; t->miph[l] = ph; continue;
+        }
+        uint32_t *dst = (uint32_t*)malloc((size_t)w * h * 4);
+        if (!dst) { t->mip[l] = NULL; t->mipw[l] = pw; t->miph[l] = ph; continue; }
         for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
             int sx = x * 2, sy = y * 2;
             if (sx >= pw) sx = pw - 1;

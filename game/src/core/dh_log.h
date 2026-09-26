@@ -14,6 +14,8 @@ typedef enum {
 } DhLogLevel;
 
 void dh_log_init(const char *user_dir);      /* opens crash-log.txt (rolling) */
+void dh_log_set_level(DhLogLevel lv);        /* filter: DEBUG is dev-only */
+DhLogLevel dh_log_get_level(void);
 void dh_log_shutdown(void);
 void dh_log(DhLogLevel lv, const char *tag, const char *fmt, ...);
 void dh_log_action(const char *fmt, ...);    /* human-readable recent action */

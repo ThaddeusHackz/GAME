@@ -2,7 +2,8 @@
 # ══════════════════════════════════════════════════════════════════════════
 # DIVIDED HORIZON — build driver
 #
-#   tools/build.sh test       Linux headless build + run the smoke test
+#   tools/build.sh test       Linux headless build + run BOTH smoke tests
+#   tools/build.sh run        build the headless game and run the demo course
 #   tools/build.sh windows    cross-compile DividedHorizon.exe via zig cc
 #   tools/build.sh all        both
 #
@@ -43,6 +44,16 @@ CORE_SRC=(
 GL_SRC=(
   "$GAME/src/rend/gl11.c"
 )
+# M1+: world / player / app layers. Shared by the traversal test, the headless
+# game binary and the Windows exe — one source of truth for gameplay code.
+GAME_SRC=(
+  "$GAME/src/rend/font.c"
+  "$GAME/src/rend/proc_tex.c"
+  "$GAME/src/world/terrain.c"
+  "$GAME/src/world/collision.c"
+  "$GAME/src/player/player.c"
+  "$GAME/src/game/game.c"
+)
 PLAT_SRC_LINUX=(
   "$GAME/src/plat/headless.c"
 )
@@ -66,20 +77,52 @@ run_smoke() {
 }
 
 # ── Linux headless test build ──────────────────────────────────────────────
-build_test() {
-  echo "══ [1/2] Linux headless test build (gcc) ══"
-  local src=("${CORE_SRC[@]}" "$GAME/tests/smoke_core.c")
-  local exe="$BUILD/dh_smoke"
+compile_host() {
+  local out="$1"; shift
   if have gcc; then
-    gcc $CSTD $OPT $WARN -o "$exe" "${src[@]}" -lm || { echo "compile FAILED"; return 1; }
+    gcc $CSTD $OPT $WARN -I"$GAME/src" -o "$out" "$@" -lm
   elif [ -x "$ZIG" ]; then
     echo "   (gcc absent — using zig cc as host compiler)"
-    "$ZIG" cc $CSTD $OPT -target native -o "$exe" "${src[@]}" || { echo "compile FAILED"; return 1; }
+    "$ZIG" cc $CSTD $OPT -I"$GAME/src" -target native -o "$out" "$@"
   else
     echo "   BLOCKED: no gcc and no zig on PATH"
     return 1
   fi
-  run_smoke "$exe"
+}
+
+build_test() {
+  echo "══ [1/3] Linux headless test build (gcc) ══"
+  local rc=0
+  local exe="$BUILD/dh_smoke"
+  compile_host "$exe" "${CORE_SRC[@]}" "$GAME/tests/smoke_core.c" \
+      || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe" || rc=1
+  local exe2="$BUILD/dh_smoke_traversal"
+  compile_host "$exe2" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/tests/smoke_traversal.c" || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe2" || rc=1
+  return $rc
+}
+
+# ── headless game binary (the shipping exe's simulation, minus the window) ──
+build_run() {
+  echo "══ headless game build + demo run ══"
+  local exe="$BUILD/dh_headless"
+  compile_host "$exe" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/src/main.c" || { echo "compile FAILED"; return 1; }
+  mkdir -p "$BUILD/shots"
+  echo "── running 14 s scripted traversal demo → $BUILD/shots"
+  "$exe" --headless --shots "$BUILD/shots" --fast
+}
+
+# ── course stills for the milestone reports (dev tool, not shipped) ───────
+build_shots() {
+  echo "══ headless course flythrough + stills ══"
+  local exe="$BUILD/dh_course_shots"
+  compile_host "$exe" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$ROOT/tools/diag/course_shot.c" || { echo "compile FAILED"; return 1; }
+  mkdir -p "$BUILD/shots"
+  "$exe"
 }
 
 # ── Windows cross build ────────────────────────────────────────────────────
@@ -122,7 +165,7 @@ build_windows() {
     return 1
   fi
   echo "   zig: $("$ZIG" version 2>/dev/null | head -1)"
-  local src=("${CORE_SRC[@]}")
+  local src=("${CORE_SRC[@]}" "${GAME_SRC[@]}")
   local plat=()
   if [ -f "$GAME/src/plat/win32.c" ]; then plat=("${PLAT_SRC_WIN[@]}"); fi
   if [ -f "$GAME/src/rend/gl11.c" ];     then src+=("${GL_SRC[@]}"); fi
@@ -158,10 +201,12 @@ target="${1:-test}"
 rc=0
 case "$target" in
   test)        build_test || rc=1 ;;
+  run)         build_run || rc=1 ;;
+  shots)       build_shots || rc=1 ;;
   crosscheck)  build_crosscheck || rc=1 ;;
   windows)     build_windows || rc=1 ;;
   all)         build_test || rc=1; build_crosscheck || rc=1; build_windows || rc=1 ;;
   zip)         build_windows || rc=1; build_zip || rc=1 ;;
-  *)           echo "usage: $0 [test|crosscheck|windows|all|zip]"; exit 2 ;;
+  *)           echo "usage: $0 [test|run|shots|crosscheck|windows|all|zip]"; exit 2 ;;
 esac
 exit $rc

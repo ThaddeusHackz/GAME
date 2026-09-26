@@ -12,9 +12,14 @@
 #include <math.h>
 
 #define DH_VERSION_MAJOR 0
-#define DH_VERSION_MINOR 1
+#define DH_VERSION_MINOR 2
 #define DH_VERSION_PATCH 0
-#define DH_BUILD_NAME    "M0 Bootstrap"
+#define DH_BUILD_NAME    "M1 Traversal"
+
+#define DH_STR2(x) #x
+#define DH_STR(x)  DH_STR2(x)
+#define DH_VERSION_STRING \
+    DH_STR(DH_VERSION_MAJOR) "." DH_STR(DH_VERSION_MINOR) "." DH_STR(DH_VERSION_PATCH)
 
 #define DH_TICK_HZ       60.0f
 #define DH_TICK_DT       (1.0f / DH_TICK_HZ)

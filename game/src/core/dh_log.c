@@ -186,7 +186,15 @@ static const char *lv_name(DhLogLevel lv) {
     switch (lv) { case DH_LOG_DEBUG: return "DBG"; case DH_LOG_INFO: return "INF";
                   case DH_LOG_WARN: return "WRN"; default: return "ERR"; }
 }
+static DhLogLevel g_min_level = DH_LOG_INFO;
+
+/* WHY: milestone verification runs produce a lot of DEBUG noise, but a player
+   running the shipped exe should never see engine chatter on stdout. */
+void dh_log_set_level(DhLogLevel lv) { g_min_level = lv; }
+DhLogLevel dh_log_get_level(void) { return g_min_level; }
+
 void dh_log(DhLogLevel lv, const char *tag, const char *fmt, ...) {
+    if (lv < g_min_level) return;
     char msg[1024];
     va_list ap; va_start(ap, fmt); vsnprintf(msg, sizeof(msg), fmt, ap); va_end(ap);
     double t = dh_now_sec() - g_t0;
