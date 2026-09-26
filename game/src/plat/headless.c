@@ -50,7 +50,10 @@ typedef struct {
 
 static Headless *g_hl = NULL;
 
-/* ── clock ─────────────────────────────────────────────────────────────── */
+/* ── clock ────────────────────────────────────────────────────────────── */
+/* On Windows the win32 platform layer owns the clock (QueryPerformanceCounter)
+   so headless and windowed builds share one monotonic source. */
+#ifndef _WIN32
 uint64_t plat_now_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -63,6 +66,7 @@ void plat_sleep_ms(int ms) {
     ts.tv_nsec = (long)(ms % 1000) * 1000000L;
     nanosleep(&ts, NULL);
 }
+#endif
 
 /* ── default script: run, sprint, jump, vault, swim, look around ───────── */
 /* WHY a function and not a macro: the first version used KEY(t,mx,my,...) and

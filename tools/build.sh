@@ -165,9 +165,17 @@ build_windows() {
     return 1
   fi
   echo "   zig: $("$ZIG" version 2>/dev/null | head -1)"
-  local src=("${CORE_SRC[@]}" "${GAME_SRC[@]}")
-  local plat=()
-  if [ -f "$GAME/src/plat/win32.c" ]; then plat=("${PLAT_SRC_WIN[@]}"); fi
+  # The Windows exe ships the GL11 backend, so soft.c (same rend_be_* symbols)
+  # must stay out of this link; headless/Linux builds keep soft.c.
+  local src=()
+  for f in "${CORE_SRC[@]}"; do
+    case "$f" in *"/soft.c") ;; *) src+=("$f") ;; esac
+  done
+  src+=("${GAME_SRC[@]}")
+  # headless stays in the Windows build too: `DividedHorizon.exe --headless`
+  # is how the shipped binary is verified on machines with no display.
+  local plat=("${PLAT_SRC_LINUX[@]}")
+  if [ -f "$GAME/src/plat/win32.c" ]; then plat+=("${PLAT_SRC_WIN[@]}"); fi
   if [ -f "$GAME/src/rend/gl11.c" ];     then src+=("${GL_SRC[@]}"); fi
   src+=("$GAME/src/main.c")
   local exe="$DIST/DividedHorizon.exe"

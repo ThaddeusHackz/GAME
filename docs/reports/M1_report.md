@@ -137,14 +137,51 @@ regenerable captures out of the repo (Spec 9 honest sizes).
 | **Ledge grab / shimmy** | Implemented as *air-mantle* (catch + climb in one motion ≤ 4 m). A hanging/shimmy state (ledge-hang, side-step along a lip) is deferred to M2 combat-cover work. |
 | **Zipline sway** | Pendulum spring, not verlet rope. Reads correctly at speed; a segmented rope is M7 polish. |
 | **In-game rebind screen** | Settings layer + persistence + 57 actions are M0-complete and core-tested; the *UI screen* is M5. Rebinding itself works today via `settings.json`. |
-| **60 fps proof** | **Not yet provable on GPU here** (no display/GPU in sandbox). Honest proxy: sim cost 0.01 ms/frame; the *software* rasterizer (the `--safe-mode` fallback) costs 29 ms/frame at 960×540 single-threaded ≈ 34 fps — it is an emergency fallback, not the shipping path. The GL11 backend + win32 window (M1b) is what Spec 15.1 will be measured on. |
+| **60 fps proof** | The GPU path now **exists** (M1b, §7) but is still **not measurable in this sandbox** (no display/GPU/Windows). Honest proxy: sim cost 0.01 ms/frame; the *software* rasterizer (`--safe-mode` fallback) costs 29 ms/frame at 960×540 single-threaded ≈ 34 fps. Spec 15.1's 60 fps must be re-measured on real hardware via the GL11 backend — logged for M8. |
 | **Wingsuit / parachute** | Island skill unlocks by design (M3/M6), not M1 stubs. |
 
 ---
 
-## 6. Next
+## 6. M1b addendum — the real window and the real GPU path
 
-**M1b:** `rend/gl11.c` (fixed-function GL backend behind the same `rend.h`
-command list) + `plat/win32.c` (window, keyboard/mouse, GL context, v-sync) so
-`tools/build.sh windows` yields a playable `DividedHorizon.exe`, then M2
-combat.
+Shipped in the same milestone because Spec 17 forbids a milestone that cannot
+produce the .exe:
+
+- **`game/src/rend/gl11.c`** — OpenGL 1.1 fixed-function backend implementing
+  the *same five* `rend_be_*` entry points as soft.c against the shared
+  `rend.h` command list: directional sun via `GL_LIGHT0` (hemisphere fill
+  folded into ambient), linear distance fog, per-item alpha/blend/depth-mask/
+  alpha-test, camera-facing billboards, 3D lines, screen-space ortho quads for
+  the HUD, particle quads, lazy texture upload with full mip chains into
+  `Texture::gl_id`, and a `glReadPixels` readback so screenshots and the
+  colourblind/brightness post pass keep working on GL (Spec 60).
+- **`game/src/plat/win32.c`** — window class + WGL pixel format/context,
+  v-sync via `wglSwapIntervalEXT` when present, keyboard/mouse → `PlatInput`
+  with the radians-per-frame look contract, FPS-style cursor lock, and
+  `QueryPerformanceCounter` timing shared with headless builds.
+- **Build matrix:** the Windows link swaps soft.c out for gl11.c (same
+  symbols, one backend per binary); headless.c stays in *both* so
+  `DividedHorizon.exe --headless` remains verifiable on display-less machines.
+
+```
+$ tools/build.sh windows
+   ✓ dist/DividedHorizon.exe (356K)
+   PE32+ x64, subsystem=GUI, 10 sections, 363008 bytes
+   imports: gdi32.dll, opengl32.dll, user32.dll, kernel32.dll, msvcrt.dll
+   ✓ PE verified: Win64 GUI exe, imports only OS-shipped DLLs
+$ tools/build.sh zip
+   ✓ dist/DividedHorizon-v0-win64.zip (176K)   ← honest size, no padding
+```
+
+**What is NOT proven yet (Honesty Contract):** this sandbox has no Windows and
+no GPU, so the .exe is verified *structurally* (PE header, subsystem, import
+table, identical sources to the headless build that passes 154/154 checks) but
+not *executed*. First run on real hardware is a required M2 gate; if the GL
+context creation fails there, main.c already falls back to `--soft` and the
+headless path (Spec 19 graceful degradation).
+
+## 7. Next
+
+M2 combat: hitscan/ballistic weapons, enemy AI stubs on the course, cover,
+the wanted-level skeleton — measured again with `tools/build.sh test`, and
+this time with a human-playable Windows build as the acceptance surface.
