@@ -1,0 +1,13 @@
+# M2 combat arena demo.
+# With 6 hostiles, spawn #3 lands dead ahead of the south gate (~14 m), so the
+# first 1.2 s is a static aimed burst (guaranteed kill), then a slow sweep.
+# buttons: FIRE=0x10 AIM=0x20 CROUCH=0x4 ; look is rad per frame
+key 0.0  0 0 0x34 0 0
+shot 0.9 m2_arena_a
+key 1.3  0 0 0x34 0.0010 0.0006
+shot 3.0 m2_arena_b
+key 3.6  0 0 0x34 -0.0020 0.0006
+shot 5.0 m2_arena_c
+key 5.6  0 0 0x34 0.0015 0
+shot 7.2 m2_arena_d
+end 8.2

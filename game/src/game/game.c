@@ -278,6 +278,530 @@ static void build_traversal_course(Game *g) {
             C.x, C.z, P, g->prop_count, g->zips.count);
 }
 
+/* ══════════════════════════════ M2: combat ═══════════════════════════════
+   Arena, loadout, hitscan, enemy↔player damage flow, pickups, tracers/FX.
+   Design rule (§68): the player should never wonder "did that hit?" — every
+   shot answers with a tracer, an impact, a hitmarker or a corpse.          */
+
+static void pickup_add(Game *g, Vec3 pos, int kind, int ammo, float amount)
+{
+    for (int i = 0; i < PICKUP_MAX; i++) {
+        if (g->pickups.v[i].live) continue;
+        Pickup *k = &g->pickups.v[i];
+        k->pos = pos; k->kind = kind; k->ammo = ammo;
+        k->amount = amount; k->live = 1; k->bob = rng_f(&g->rng) * 6.28f;
+        if (i >= g->pickups.count) g->pickups.count = i + 1;
+        return;
+    }
+}
+
+static void tracer_add(Game *g, Vec3 a, Vec3 b, uint32_t color)
+{
+    for (int i = 0; i < TRACER_MAX; i++) {
+        if (g->tracers.v[i].life <= 0.f) {
+            g->tracers.v[i].a = a; g->tracers.v[i].b = b;
+            g->tracers.v[i].life = 0.07f;
+            g->tracers.v[i].color = color;
+            if (i >= g->tracers.count) g->tracers.count = i + 1;
+            return;
+        }
+    }
+}
+
+static void fx_spawn(Game *g, Vec3 pos, Vec3 dir, int n, uint32_t color,
+                     float speed, float life, int kind)
+{
+    for (int i = 0; i < n && g->fx_count < (int)(sizeof g->fx / sizeof g->fx[0]); i++) {
+        Particle *pt = &g->fx[g->fx_count++];
+        pt->pos = pos;
+        pt->vel = v3_add(v3_mul(dir, speed * (0.4f + rng_f(&g->rng))),
+                         v3(rng_range(&g->rng, -1.f, 1.f),
+                            rng_range(&g->rng, 0.2f, 2.f),
+                            rng_range(&g->rng, -1.f, 1.f)));
+        pt->vel = v3_mul(pt->vel, speed * 0.5f);
+        pt->life = pt->max_life = life * (0.6f + 0.6f * rng_f(&g->rng));
+        pt->size = 0.05f + 0.05f * rng_f(&g->rng);
+        pt->color = color;
+        pt->kind = kind;
+    }
+}
+
+static void fx_update(Game *g, float dt)
+{
+    for (int i = 0; i < g->fx_count; ) {
+        Particle *pt = &g->fx[i];
+        pt->life -= dt;
+        if (pt->life <= 0.f) { g->fx[i] = g->fx[--g->fx_count]; continue; }
+        pt->vel.y -= 14.f * dt;
+        pt->pos = v3_add(pt->pos, v3_mul(pt->vel, dt));
+        i++;
+    }
+}
+
+/* ── the combat arena: a flat yard east of the traversal course with crates,
+   low walls and two platforms — 30-hostile DoD playground (§16 M2) ─────── */
+static void build_combat_arena(Game *g)
+{
+    const Vec3 A = v3(440.0f, 0.0f, 630.0f);
+    const int WOOD = proc_tex.wood, CONC = proc_tex.concrete;
+    const uint32_t CW = 0xFFB0C8D8u;
+    float h = terrain_height(&g->terrain, A.x, A.z);
+    terrain_flatten(&g->terrain, A, 46.0f, 42.0f, h, 14.0f);
+    g->arena_center = v3(A.x, h, A.z);
+
+    /* cover crates (vault-height: 2.2 m tops are climbable — M1 verbs work here) */
+    static const float cx[] = { -14, -6, 3, 11, 18, -18, -9, 0, 8, 15, -3, 6 };
+    static const float cz[] = { -10, 6, -14, 4, -6, 12, 16, 10, 18, 12, -20, -8 };
+    for (size_t i = 0; i < sizeof cx / sizeof cx[0]; i++)
+        prop_top_box(g, A.x + cx[i], h + 2.2f, A.z + cz[i], 1.1f, 1.1f, 1.1f,
+                     WOOD, 0xFFC0D0E0u);
+    /* low walls (crouch-cover: 1.2 m tops hide a crouched player) */
+    prop_top_box(g, A.x - 20.f, h + 1.2f, A.z - 2.f, 5.0f, 0.6f, 0.4f, CONC, CW);
+    prop_top_box(g, A.x + 20.f, h + 1.2f, A.z + 2.f, 5.0f, 0.6f, 0.4f, CONC, CW);
+    prop_top_box(g, A.x - 2.f, h + 1.2f, A.z - 22.f, 0.4f, 0.6f, 5.0f, CONC, CW);
+    prop_top_box(g, A.x + 2.f, h + 1.2f, A.z + 22.f, 0.4f, 0.6f, 5.0f, CONC, CW);
+    /* two raised platforms with crate stairs (height advantage language) */
+    prop_top_box(g, A.x - 30.f, h + 3.6f, A.z - 16.f, 3.0f, 0.3f, 3.0f, CONC, CW);
+    prop_top_box(g, A.x - 30.f, h + 1.2f, A.z - 10.5f, 1.2f, 0.6f, 1.2f, WOOD, 0xFFC0D0E0u);
+    prop_top_box(g, A.x - 30.f, h + 2.4f, A.z - 13.f, 1.2f, 0.6f, 1.2f, WOOD, 0xFFC0D0E0u);
+    prop_top_box(g, A.x + 30.f, h + 3.6f, A.z + 16.f, 3.0f, 0.3f, 3.0f, CONC, CW);
+    prop_top_box(g, A.x + 30.f, h + 1.2f, A.z + 10.5f, 1.2f, 0.6f, 1.2f, WOOD, 0xFFC0D0E0u);
+    prop_top_box(g, A.x + 30.f, h + 2.4f, A.z + 13.f, 1.2f, 0.6f, 1.2f, WOOD, 0xFFC0D0E0u);
+
+    DH_INFO("game", "combat arena built at (%.0f,%.0f) deck %.1f m", A.x, A.z, h);
+}
+
+/* Grant a weapon into a slot; `fill` also stocks mag + reserve. */
+static void game_give_weapon(Game *g, int slot, const char *id, int fill)
+{
+    if (!g || slot < 0 || slot >= WPN_SLOT_MAX) return;
+    const WeaponDef *w = weapon_by_id(id);
+    if (!w) { DH_WARN("game", "give: unknown weapon %s", id ? id : "?"); return; }
+    int idx = (int)(w - weapons_get(0));
+    g->wpn_def[slot] = idx;
+    if (fill) {
+        g->wpn_mag[slot] = w->mag;
+        g->ammo[w->ammo] += w->mag * 4;
+    }
+}
+
+void game_arena_start(Game *g, int n_enemies)
+{
+    if (!g || !g->ready) return;
+    int n = dh_clampi(n_enemies, 1, ENEMY_MAX);
+
+    /* armory: sidearm + rifle + shotgun (M2 DoD; story unlocks come in M6) */
+    game_give_weapon(g, 0, "W01", 1);
+    game_give_weapon(g, 1, "W05", 1);
+    game_give_weapon(g, 2, "W08", 1);
+    g->wpn_slot = 0;
+
+    enemies_init(&g->enemies);
+    for (int i = 0; i < PICKUP_MAX; i++) g->pickups.v[i].live = 0;
+    g->pickups.count = 0;
+    for (int i = 0; i < TRACER_MAX; i++) g->tracers.v[i].life = 0.f;
+    g->tracers.count = 0;
+    g->fx_count = 0;
+    g->hitmark_t = 0.f; g->damage_flash = 0.f; g->noise_t = 0.f;
+    g->rec_pitch = 0.f; g->rec_yaw = 0.f;
+    const Vec3 A = g->arena_center;
+    for (int i = 0; i < n; i++) {
+        float ang = (float)i * 6.2831853f / (float)n;
+        float rad = 18.f + (float)(i % 4) * 4.5f;
+        Vec3 pos = v3(A.x + sinf(ang) * rad, 0.f, A.z + cosf(ang) * rad);
+        pos.y = terrain_height(&g->terrain, pos.x, pos.z);
+        int arch = (i % 10 == 9) ? EN_OFFICER : ((i % 4 == 3) ? EN_BRUISER : EN_GRUNT);
+        Vec3 pa = pos;
+        Vec3 pb = v3(A.x + sinf(ang + 0.6f) * (rad * 0.6f), 0.f,
+                     A.z + cosf(ang + 0.6f) * (rad * 0.6f));
+        pb.y = terrain_height(&g->terrain, pb.x, pb.z);
+        enemies_spawn(&g->enemies, pos, arch, 0 /* cult: fights to the death */, pa, pb);
+    }
+    /* a few field supplies so the arena is self-sustaining */
+    for (int i = 0; i < 4; i++) {
+        float ang = (float)i * 1.5707963f + 0.4f;
+        Vec3 pos = v3(A.x + sinf(ang) * 12.f, 0.f, A.z + cosf(ang) * 12.f);
+        pos.y = terrain_height(&g->terrain, pos.x, pos.z);
+        pickup_add(g, pos, (i & 1) ? PK_AMMO : PK_HEALTH,
+                   (i & 1) ? AMMO_556 : 0, (i & 1) ? 60.f : 40.f);
+    }
+
+    /* drop the player at the south gate, facing the yard */
+    g->player.pos = v3(A.x, terrain_height(&g->terrain, A.x, A.z - 46.f) + 0.1f, A.z - 46.f);
+    g->player.vel = v3(0.f, 0.f, 0.f);
+    g->player.yaw = 0.f;               /* +z: toward the arena centre */
+    g->player.pitch = 0.f;
+    g->player.health = 100.f;
+    g->spawn = g->player.pos;          /* arena checkpoint */
+    g->arena_active = 1;
+    g->arena_total = g->enemies.count;
+    g->kills = 0;
+    g->fire_cd = 0.f; g->reloading = 0; g->ads_k = 0.f;
+    game_start_play(g);
+    game_message(g, "COMBAT ARENA - eliminate %d hostiles. F/LMB fire, R reload, 1/2/3 weapons",
+                 g->arena_total);
+    g->message_t = 5.f;
+    DH_INFO("game", "arena start: %d hostiles (%d grunts, %d bruisers, %d officers)",
+            g->enemies.count, n - n/4 - n/10, n/4, n/10);
+}
+
+/* ── hitscan ─────────────────────────────────────────────────────────────── */
+static int ray_box_t(Vec3 o, Vec3 d, Vec3 bmin, Vec3 bmax, float tmax, float *t_out)
+{
+    float t0 = 0.f, t1 = tmax;
+    float po[3] = { o.x, o.y, o.z }, pd[3] = { d.x, d.y, d.z };
+    float lo[3] = { bmin.x, bmin.y, bmin.z }, hi[3] = { bmax.x, bmax.y, bmax.z };
+    for (int i = 0; i < 3; i++) {
+        if (fabsf(pd[i]) < 1e-8f) { if (po[i] < lo[i] || po[i] > hi[i]) return 0; continue; }
+        float inv = 1.f / pd[i];
+        float ta = (lo[i] - po[i]) * inv, tb = (hi[i] - po[i]) * inv;
+        if (ta > tb) { float tt = ta; ta = tb; tb = tt; }
+        if (ta > t0) t0 = ta;
+        if (tb < t1) t1 = tb;
+        if (t0 > t1) return 0;
+    }
+    if (t_out) *t_out = t0;
+    return 1;
+}
+
+typedef struct {
+    int   hit;
+    float t;
+    Vec3  point, normal;
+    int   enemy_i;           /* -1 = world */
+    int   zone;
+} HitScan;
+
+#define HITSCAN_RANGE 260.0f
+
+static HitScan combat_hitscan(Game *g, Vec3 o, Vec3 d)
+{
+    HitScan hs;
+    memset(&hs, 0, sizeof hs);
+    hs.enemy_i = -1;
+    hs.t = HITSCAN_RANGE;
+    hs.normal = v3_neg(d);
+
+    float tw; Vec3 nw;
+    if (obstacles_ray_hit(&g->obs, o, d, hs.t, &tw, &nw)) {
+        hs.hit = 1; hs.t = tw; hs.normal = nw;
+    }
+    /* terrain march (0.75 m steps — plenty for 260 m hitscan at 60 fps) */
+    {
+        float prev_h = terrain_height(&g->terrain, o.x, o.z);
+        float prev_s = 0.f;
+        for (float s = 0.75f; s < hs.t; s += 0.75f) {
+            Vec3 p = v3_add(o, v3_mul(d, s));
+            float h = terrain_height(&g->terrain, p.x, p.z);
+            if (p.y <= h) {
+                float f = (s - prev_s) > 1e-4f ? (p.y - prev_h) / ((p.y - prev_h) + (h - p.y) + 1e-4f) : 1.f;
+                hs.hit = 1; hs.t = prev_s + 0.75f * dh_clampf(f, 0.f, 1.f);
+                hs.normal = terrain_normal(&g->terrain, p.x, p.z);
+                break;
+            }
+            prev_h = h; prev_s = s;
+        }
+    }
+    /* enemies: oriented-ish boxes + zone bands (§6.3 damage zones) */
+    for (int i = 0; i < g->enemies.count; i++) {
+        const Enemy *e = &g->enemies.v[i];
+        if (e->state == EN_DEAD) continue;
+        float r = (e->arch == EN_BRUISER) ? 0.55f : 0.42f;
+        float hh = (e->arch == EN_BRUISER) ? 1.95f : 1.80f;
+        Vec3 bmin = v3(e->pos.x - r, e->pos.y, e->pos.z - r);
+        Vec3 bmax = v3(e->pos.x + r, e->pos.y + hh, e->pos.z + r);
+        float te;
+        if (ray_box_t(o, d, bmin, bmax, hs.t, &te)) {
+            hs.hit = 1; hs.t = te; hs.enemy_i = i;
+            Vec3 p = v3_add(o, v3_mul(d, te));
+            float rel = p.y - e->pos.y;
+            hs.zone = (rel >= hh * 0.82f) ? ZONE_HEAD :
+                      (rel >= hh * 0.45f) ? ZONE_TORSO : ZONE_LIMB;
+            hs.normal = v3_neg(d);
+        }
+    }
+    hs.point = v3_add(o, v3_mul(d, hs.t));
+    if (!v3_valid(hs.point)) { hs.hit = 0; hs.point = o; }   /* 18.4: no NaN */
+    return hs;
+}
+
+/* Cone sample for spread/pellets: orthonormal basis around d. */
+static Vec3 spread_dir(Game *g, Vec3 d, float cone_rad)
+{
+    if (cone_rad <= 0.f) return d;
+    Vec3 up = fabsf(d.y) > 0.95f ? v3(1.f, 0.f, 0.f) : v3(0.f, 1.f, 0.f);
+    Vec3 u = v3_norm(v3_cross(d, up));
+    Vec3 w = v3_cross(d, u);
+    float a = rng_f(&g->rng) * 6.2831853f;
+    float rr = cone_rad * sqrtf(rng_f(&g->rng));
+    return v3_norm(v3_add(d, v3_add(v3_mul(u, cosf(a) * rr), v3_mul(w, sinf(a) * rr))));
+}
+
+static void combat_start_reload(Game *g)
+{
+    int sl = g->wpn_slot;
+    const WeaponDef *w = weapons_get(g->wpn_def[sl]);
+    if (!w || g->reloading) return;
+    if (g->wpn_mag[sl] >= w->mag) return;
+    if (g->ammo[w->ammo] <= 0) {
+        game_message(g, "NO %s RESERVE", ammo_name(w->ammo));
+        g->message_t = 1.2f;
+        g->fire_cd = 0.4f;
+        return;
+    }
+    g->reloading = 1;
+    g->reload_slot = sl;
+    g->reload_t = w->reload_s;
+}
+
+static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
+{
+    int sl = g->wpn_slot;
+    const WeaponDef *w = weapons_get(g->wpn_def[sl]);
+    Player *p = &g->player;
+    if (!w) return;
+    if (g->wpn_mag[sl] <= 0) {                 /* dry fire → auto reload */
+        combat_start_reload(g);
+        g->fire_cd = 0.25f;
+        return;
+    }
+    g->wpn_mag[sl]--;
+    g->fire_cd = weapon_shot_interval(w);
+    g->noise_t = 0.6f;                         /* gunshots carry (§82) */
+
+    /* recoil: part permanent climb (into yaw/pitch), part decaying punch */
+    Vec3 rec = weapon_recoil(w, g->ads_k, g->shot_index++);
+    p->pitch += rec.y * 0.55f;
+    p->yaw   += rec.x * 0.55f;
+    if (p->pitch > 1.5f) p->pitch = 1.5f;
+    g->rec_pitch += rec.y;
+    g->rec_yaw   += rec.x;
+    g->rec_pitch = dh_clampf(g->rec_pitch, -0.2f, 0.2f);
+    g->rec_yaw   = dh_clampf(g->rec_yaw, -0.2f, 0.2f);
+
+    fx_spawn(g, v3_add(eye, v3_mul(dir, 0.5f)), dir, 5, 0xFF40A0FFu, 2.2f, 0.06f, 0);
+
+    float cone = weapon_spread_rad(w, g->ads_k,
+                                   v3_len(v3(p->vel.x, 0.f, p->vel.z)) > 2.6f,
+                                   p->crouched);
+    int pellets = w->pellets;
+    for (int k = 0; k < pellets; k++) {
+        Vec3 pd = (pellets > 1 || cone > 0.f) ? spread_dir(g, dir, cone) : dir;
+        HitScan hs = combat_hitscan(g, eye, pd);
+        if (hs.enemy_i >= 0) {
+            Enemy *e = &g->enemies.v[hs.enemy_i];
+            float dmg = weapon_damage(w, hs.zone, hs.t);
+            int killed = enemy_apply_damage(e, dmg, hs.zone);
+            g->hitmark_t = 0.14f;
+            g->hitmark_kill = killed;
+            fx_spawn(g, hs.point, v3_mul(pd, -0.4f), 6, 0xFF2828B0u, 2.5f, 0.25f, 2);
+            if (killed) {
+                g->kills++;
+                e->dropped = 1;
+                /* loot roll: 30% health, 45% ammo for the gun in hand, else nothing */
+                float rr = rng_f(&g->rng);
+                if (rr < 0.30f)
+                    pickup_add(g, v3_add(e->pos, v3(0.f, 0.4f, 0.f)), PK_HEALTH, 0, 40.f);
+                else if (rr < 0.75f)
+                    pickup_add(g, v3_add(e->pos, v3(0.f, 0.4f, 0.f)), PK_AMMO, w->ammo,
+                               (float)(w->mag * 2));
+                if (g->kills % 5 == 0) {
+                    game_message(g, "%d HOSTILES DOWN", g->kills);
+                    g->message_t = 1.5f;
+                }
+            }
+        } else if (hs.hit) {
+            fx_spawn(g, hs.point, hs.normal, 7, 0xFF90B8D8u, 3.f, 0.3f, 0);
+        }
+        tracer_add(g, v3_add(eye, v3_mul(pd, 0.6f)),
+                   hs.hit ? hs.point : v3_add(eye, v3_mul(pd, HITSCAN_RANGE)),
+                   0xFF50C8FFu);
+    }
+    if (g->wpn_mag[sl] == 0 && g->ammo[w->ammo] > 0) combat_start_reload(g);
+}
+
+static void combat_pickups_update(Game *g, float dt)
+{
+    Player *p = &g->player;
+    for (int i = 0; i < g->pickups.count; i++) {
+        Pickup *k = &g->pickups.v[i];
+        if (!k->live) continue;
+        k->bob += dt * 2.4f;
+        if (player_is_down(p)) continue;
+        if (v3_dist_xz(p->pos, k->pos) < 1.3f && fabsf(p->pos.y - k->pos.y) < 2.2f) {
+            if (k->kind == PK_HEALTH) {
+                if (p->health >= 100.f) continue;          /* don't waste it */
+                p->health = dh_clampf(p->health + k->amount, 0.f, 100.f);
+                game_message(g, "MEDKIT +%.0f HP", (double)k->amount);
+            } else {
+                g->ammo[k->ammo] += (int)k->amount;
+                game_message(g, "%s AMMO +%d", ammo_name(k->ammo), (int)k->amount);
+            }
+            g->message_t = 1.4f;
+            k->live = 0;
+        }
+    }
+}
+
+static void combat_update(Game *g, const PlatInput *in, float dt)
+{
+    Player *p = &g->player;
+
+    /* timers */
+    if (g->fire_cd > 0.f)     g->fire_cd -= dt;
+    if (g->hitmark_t > 0.f)   g->hitmark_t -= dt;
+    if (g->damage_flash > 0.f)g->damage_flash -= dt * 2.5f;
+    if (g->noise_t > 0.f)     g->noise_t -= dt;
+    {
+        float k = dh_clampf(10.f * dt, 0.f, 1.f);
+        g->rec_pitch *= (1.f - k);
+        g->rec_yaw   *= (1.f - k);
+    }
+    for (int i = 0; i < g->tracers.count; i++)
+        if (g->tracers.v[i].life > 0.f) g->tracers.v[i].life -= dt;
+    fx_update(g, dt);
+    combat_pickups_update(g, dt);
+
+    /* ADS blend (§68: 180 ms pistol — weapon-specific) */
+    const WeaponDef *w = weapons_get(g->wpn_def[g->wpn_slot]);
+    int want_ads = (in->buttons & BTN_AIM) && !g->reloading && w && !player_is_down(p);
+    float ads_rate = w ? (1.f / w->ads_s) : 6.f;
+    if (want_ads)  g->ads_k = dh_clampf(g->ads_k + ads_rate * dt, 0.f, 1.f);
+    else           g->ads_k = dh_clampf(g->ads_k - ads_rate * 1.4f * dt, 0.f, 1.f);
+    g->cam_fov = 78.f * (1.f - 0.22f * g->ads_k);
+
+    /* weapon slot switch */
+    if (in->pressed & BTN_SLOT1) { if (g->wpn_def[0] >= 0) { g->wpn_slot = 0; g->reloading = 0; g->fire_cd = 0.3f; } }
+    if (in->pressed & BTN_SLOT2) { if (g->wpn_def[1] >= 0) { g->wpn_slot = 1; g->reloading = 0; g->fire_cd = 0.3f; } }
+    if (in->pressed & BTN_SLOT3) { if (g->wpn_def[2] >= 0) { g->wpn_slot = 2; g->reloading = 0; g->fire_cd = 0.3f; } }
+
+    /* reload FSM */
+    if ((in->pressed & BTN_RELOAD) && !g->reloading) combat_start_reload(g);
+    if (g->reloading) {
+        g->reload_t -= dt;
+        if (g->reload_t <= 0.f) {
+            int sl = g->reload_slot;
+            const WeaponDef *rw = weapons_get(g->wpn_def[sl]);
+            if (rw) {
+                int need = rw->mag - g->wpn_mag[sl];
+                int take = need < g->ammo[rw->ammo] ? need : g->ammo[rw->ammo];
+                if (take > 0) { g->wpn_mag[sl] += take; g->ammo[rw->ammo] -= take; }
+            }
+            g->reloading = 0;
+        }
+    }
+
+    /* fire (full-auto cadence from rpm — §68 rate table) */
+    if (w && (in->buttons & BTN_FIRE) && g->fire_cd <= 0.f && !g->reloading &&
+        !player_is_down(p)) {
+        Vec3 eye, dir;
+        player_camera(p, &eye, &dir);
+        combat_fire(g, eye, dir);
+    }
+
+    /* ── enemies ── */
+    EnemyView pv;
+    pv.eye = v3(p->pos.x, p->pos.y + p->eye, p->pos.z);
+    pv.crouched = p->crouched;
+    pv.moving = v3_len(v3(p->vel.x, 0.f, p->vel.z)) > 3.0f;
+    pv.alive = !player_is_down(p);
+    pv.light = 1.0f;                          /* M2: golden-hour daylight */
+    pv.noise = g->noise_t > 0.f ? 1.0f : 0.0f;
+    int hp_before = (int)p->health;
+    enemies_update(&g->enemies, &pv, dt, &g->terrain, &g->obs);
+
+    /* enemy shots resolve against the player (accuracy roll, §82) */
+    for (int i = 0; i < g->enemies.count; i++) {
+        Enemy *e = &g->enemies.v[i];
+        if (!e->shot_this_frame) continue;
+        Vec3 muz = v3_add(e->pos, v3(0.f, 1.45f, 0.f));
+        tracer_add(g, muz, v3_add(pv.eye, v3(rng_range(&g->rng, -0.4f, 0.4f),
+                                             rng_range(&g->rng, -0.4f, 0.4f),
+                                             rng_range(&g->rng, -0.4f, 0.4f))),
+                   0xFF3030F0u);
+        fx_spawn(g, muz, v3_mul(v3_sub(pv.eye, muz), 0.05f), 3, 0xFF40A0FFu, 2.f, 0.06f, 0);
+        if (rng_f(&g->rng) < e->shot_acc) {
+            float dmg = enemy_shot_damage(e->arch);
+            p->health = dh_clampf(p->health - dmg, 0.f, 100.f);
+            g->damage_flash = 0.5f;
+        }
+    }
+    if ((int)p->health < hp_before && p->health <= 0.f) {
+        game_message(g, "YOU DIED - respawning at checkpoint (loadout kept)");
+        g->message_t = 3.f;
+    }
+
+    /* arena clear */
+    if (g->arena_active && g->enemies.alive_count == 0) {
+        g->arena_active = 0;
+        game_message(g, "ARENA CLEAR - %d hostiles down. The yard is yours.", g->kills);
+        g->message_t = 6.f;
+        DH_INFO("game", "arena cleared: %d kills", g->kills);
+    }
+}
+
+/* ── combat rendering ───────────────────────────────────────────────────── */
+static void draw_enemies(Game *g)
+{
+    Mat4 ident_base = m4_identity();
+    (void)ident_base;
+    for (int i = 0; i < g->enemies.count; i++) {
+        const Enemy *e = &g->enemies.v[i];
+        if (!rend_should_draw(&e->pos, 2.2f)) continue;
+        float w = (e->arch == EN_BRUISER) ? 0.62f : 0.46f;
+        float hh = (e->arch == EN_BRUISER) ? 1.95f : 1.80f;
+        uint32_t body, head = 0xFF6A8CB4u;
+        if (e->state == EN_DEAD)       body = 0xFF202830u;
+        else if (e->hit_t > 0.f)       body = 0xFFE0E0E0u;      /* hit flash */
+        else if (e->state == EN_COMBAT)body = (e->arch == EN_OFFICER) ? 0xFF283068u : 0xFF2E3E8Cu;
+        else if (e->state == EN_SEARCH || e->state == EN_SUSPICIOUS)
+                                       body = 0xFF2E4A7Au;
+        else                           body = (e->arch == EN_BRUISER) ? 0xFF3A4664u : 0xFF2E4A6Eu;
+        if (e->state == EN_DEAD) {
+            /* corpse: flat box, keeps the yard honest about what you did */
+            Mat4 m = m4_mul(m4_translate(v3(e->pos.x, e->pos.y + 0.22f, e->pos.z)),
+                            m4_scale(v3(w * 2.4f, 0.44f, w * 1.6f)));
+            rend_mesh_lit(g->mesh_box, &m, -1, body, 1.f, 1, 1, 1, 0, 1);
+            continue;
+        }
+        Mat4 mb = m4_mul(m4_translate(v3(e->pos.x, e->pos.y + hh * 0.42f, e->pos.z)),
+                         m4_scale(v3(w * 2.f, hh * 0.84f, w * 1.4f)));
+        rend_mesh_lit(g->mesh_box, &mb, -1, body, 1.f, 1, 1, 1, 0, 1);
+        Mat4 mh = m4_mul(m4_translate(v3(e->pos.x, e->pos.y + hh * 0.92f, e->pos.z)),
+                         m4_scale1(0.42f));
+        rend_mesh_lit(g->mesh_box, &mh, -1, head, 1.f, 1, 1, 1, 0, 1);
+        /* facing nub: which way is this thing looking? (readability, §33) */
+        Vec3 fw = v3(sinf(e->yaw), 0.f, cosf(e->yaw));
+        Mat4 mg = m4_mul(m4_translate(v3_add(e->pos,
+                            v3(fw.x * (w + 0.3f), hh * 0.55f, fw.z * (w + 0.3f)))),
+                         m4_scale(v3(0.5f, 0.12f, 0.12f)));
+        rend_mesh_lit(g->mesh_box, &mg, -1, 0xFF303050u, 1.f, 1, 1, 1, 0, 1);
+    }
+}
+
+static void draw_pickups(Game *g)
+{
+    for (int i = 0; i < g->pickups.count; i++) {
+        const Pickup *k = &g->pickups.v[i];
+        if (!k->live || !rend_should_draw(&k->pos, 1.f)) continue;
+        float y = k->pos.y + 0.55f + sinf(k->bob) * 0.09f;
+        Mat4 m = m4_mul(m4_translate(v3(k->pos.x, y, k->pos.z)), m4_scale1(0.44f));
+        uint32_t c = (k->kind == PK_HEALTH) ? 0xFF50C860u : 0xFF30A8F0u;
+        rend_mesh_lit(g->mesh_box, &m, -1, c, 1.f, 1, 1, 1, 0, 1);
+    }
+}
+
+static void draw_tracers_fx(Game *g)
+{
+    for (int i = 0; i < g->tracers.count; i++) {
+        const Tracer *tr = &g->tracers.v[i];
+        if (tr->life <= 0.f) continue;
+        Vec3 pts[2] = { tr->a, tr->b };
+        rend_lines(pts, 1, tr->color, 1.6f);
+    }
+    if (g->fx_count > 0) rend_particles(g->fx, g->fx_count, -1, 1.f);
+}
+
 /* Sun + atmosphere. M1 keeps a fixed golden-hour key light; M3 adds the
    24-minute day/night cycle (Spec 6.7) on top of this same struct. */
 static void setup_light(Game *g) {
@@ -363,6 +887,17 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     zips_init(&g->zips);
     build_traversal_course(g);
 
+    /* ── combat (M2) ── */
+    rng_seed(&g->rng, g->seed ^ 0xC0FFEEu);
+    weapons_load(NULL);
+    enemies_init(&g->enemies);
+    g->pickups.count = 0;
+    g->tracers.count = 0;
+    g->fx_count = 0;
+    for (int i = 0; i < WPN_SLOT_MAX; i++) { g->wpn_def[i] = -1; g->wpn_mag[i] = 0; }
+    g->wpn_slot = 0;
+    build_combat_arena(g);
+
     int chunks = terrain_build_chunks(&g->terrain, CHUNK_M);
     if (chunks <= 0) { DH_ERROR("game", "terrain meshing failed"); return 0; }
 
@@ -386,7 +921,7 @@ void game_start_play(Game *g) {
     g->mode = GM_PLAY;
     g->message_t = 5.0f;
     dh_strcpy_safe(g->message, sizeof(g->message),
-                   "WASD move - SHIFT sprint - SPACE jump/vault - CTRL crouch - R roll");
+                   "WASD move - SHIFT sprint - SPACE jump/vault - CTRL crouch - V roll");
     DH_INFO("game", "entering PLAY");
 }
 
@@ -430,11 +965,20 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
 
     if (in->pressed & BTN_PAUSE) { g->mode = GM_PAUSE; return; }
 
+    /* ── combat sim runs first: ADS/recoil state then feeds movement ── */
+    combat_update(g, in, dt);
+
     /* ── map abstract buttons → player intent ── */
     PlayerInput pi;
     memset(&pi, 0, sizeof(pi));
     pi.mx = dh_clampf(in->mx, -1.0f, 1.0f);
     pi.my = dh_clampf(in->my, -1.0f, 1.0f);
+    /* ADS movement penalty: aiming trades mobility for accuracy (§6.2) */
+    {
+        float ads_mul = 1.0f - 0.45f * g->ads_k;
+        pi.mx *= ads_mul;
+        pi.my *= ads_mul;
+    }
     float sx = s->invert_x ? -1.0f : 1.0f;
     float sy = s->invert_y ? -1.0f : 1.0f;
     /* PlatInput look deltas are RADIANS per frame — the platform converts its
@@ -485,13 +1029,18 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
         g->message_t = 1.0f;
     }
 
-    /* ── death → auto-respawn (M2 adds the proper death/last-checkpoint flow) ── */
+    /* ── death → respawn at last checkpoint; loadout kept, dead stay dead (§6.2) ── */
     if (player_is_down(&g->player)) {
         g->respawn_t += dt;
-        if (g->respawn_t > 2.0f) {
+        g->damage_flash = 1.0f;
+        if (g->respawn_t > 2.5f) {
             g->respawn_t = 0.0f;
             player_respawn(&g->player, g->spawn);
-            game_message(g, "RESPAWNED at course start");
+            g->damage_flash = 0.0f;
+            g->reloading = 0;
+            game_message(g, "RESPAWNED at checkpoint - loadout kept, %d hostiles remain",
+                         g->enemies.alive_count);
+            g->message_t = 3.0f;
         }
     } else {
         g->respawn_t = 0.0f;
@@ -503,6 +1052,11 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
         game_message(g, g->mode == GM_PHOTO ? "PHOTO MODE (HUD off)" : "PHOTO MODE off");
     }
     if (in->pressed & BTN_MAP) { g->show_debug = !g->show_debug; }
+
+    /* M2 dev/DoD hotkey: deploy to the combat arena (30 hostiles) */
+    if (in->pressed & BTN_ARENA) {
+        game_arena_start(g, 30);
+    }
 }
 
 /* ══════════════════════════════ rendering ═══════════════════════════════ */
@@ -608,7 +1162,7 @@ static void draw_hud(Game *g) {
     /* top-left: mode + course objective */
     font_text_shadow(pad, pad, fs, "DIVIDED HORIZON", C_GOLD);
     char buf[160];
-    snprintf(buf, sizeof(buf), "%s  -  M1 TRAVERSAL  -  %s",
+    snprintf(buf, sizeof(buf), "%s  -  M2 COMBAT  -  %s",
              game_mode_name(g->mode), player_stance_name(p->stance));
     font_text_shadow(pad, pad + 12.0f * fs, fs * 0.85f, buf, C_DIM);
 
@@ -627,6 +1181,52 @@ static void draw_hud(Game *g) {
     }
     snprintf(buf, sizeof(buf), "%.1f m/s", sqrtf(p->vel.x*p->vel.x + p->vel.z*p->vel.z));
     font_text_shadow(pad + bw + 8.0f*ui, by - 2.0f*ui, fs * 0.8f, buf, C_DIM);
+
+    /* ── M2: combat HUD ── */
+    /* damage vignette */
+    if (g->damage_flash > 0.0f) {
+        uint32_t a = (uint32_t)(dh_clampf(g->damage_flash, 0.0f, 1.0f) * 80.0f) << 24;
+        rend_quad2d(0, 0, W, H * 0.10f, -1, 0,0,1,1, a | 0x001818A0u);
+        rend_quad2d(0, H * 0.90f, W, H * 0.10f, -1, 0,0,1,1, a | 0x001818A0u);
+        rend_quad2d(0, 0, W * 0.07f, H, -1, 0,0,1,1, a | 0x001818A0u);
+        rend_quad2d(W * 0.93f, 0, W * 0.07f, H, -1, 0,0,1,1, a | 0x001818A0u);
+    }
+    /* hitmarker: 45° ticks around the crosshair; red X on a kill */
+    if (g->hitmark_t > 0.0f && s->crosshair_on) {
+        float cx = W * 0.5f, cy = H * 0.5f, o = 6.0f * ui, L = 5.0f * ui, t2 = 2.0f * ui;
+        uint32_t hc = g->hitmark_kill ? C_RED : C_WHITE;
+        rend_quad2d(cx - o - L, cy - o - t2*0.5f, L, t2, -1, 0,0,1,1, hc);
+        rend_quad2d(cx + o,     cy - o - t2*0.5f, L, t2, -1, 0,0,1,1, hc);
+        rend_quad2d(cx - o - L, cy + o - t2*0.5f, L, t2, -1, 0,0,1,1, hc);
+        rend_quad2d(cx + o,     cy + o - t2*0.5f, L, t2, -1, 0,0,1,1, hc);
+    }
+    /* ammo block (bottom-right, above the debug readout) */
+    const WeaponDef *cw = weapons_get(g->wpn_def[g->wpn_slot]);
+    if (cw) {
+        float ax = W - pad - 210.0f * ui, ay = H - pad - 158.0f * ui;
+        uint32_t low = g->wpn_mag[g->wpn_slot] <= cw->mag / 4 ? C_RED : C_WHITE;
+        snprintf(buf, sizeof(buf), "%s  [%d/%d]", cw->name, g->wpn_slot + 1, WPN_SLOT_MAX);
+        font_text_shadow(ax, ay, fs * 0.9f, buf, C_GOLD);
+        snprintf(buf, sizeof(buf), "%2d  |  %d %s", g->wpn_mag[g->wpn_slot],
+                 g->ammo[cw->ammo], ammo_name(cw->ammo));
+        font_text_shadow(ax, ay + 12.0f * ui, fs * 1.4f, buf, low);
+        if (g->reloading) {
+            float frac = cw->reload_s > 0.0f
+                ? dh_clampf(1.0f - g->reload_t / cw->reload_s, 0.0f, 1.0f) : 0.0f;
+            bar(ax, ay + 34.0f * ui, 120.0f * ui, 5.0f * ui, frac, C_TEAL, C_DARK);
+            font_text_shadow(ax, ay + 42.0f * ui, fs * 0.7f, "RELOADING", C_DIM);
+        }
+    }
+    /* hostile counter (top-right) */
+    if (g->arena_total > 0 && g->mode == GM_PLAY) {
+        snprintf(buf, sizeof(buf), "HOSTILES %d / %d    KILLS %d",
+                 g->enemies.alive_count, g->arena_total, g->kills);
+        font_text_shadow(W - pad - 250.0f * ui, pad, fs * 0.9f, buf,
+                         g->arena_active ? C_RED : C_JADE);
+        if (!g->arena_active && g->kills > 0)
+            font_text_shadow(W - pad - 250.0f * ui, pad + 12.0f * ui, fs * 0.8f,
+                             "ARENA CLEAR", C_JADE);
+    }
 
     /* toast message */
     if (g->message_t > 0.0f && g->message[0]) {
@@ -659,9 +1259,9 @@ static void draw_hud(Game *g) {
     }
 
     /* controls hint (bottom centre) — Spec 33: always tell the player */
-    if (g->mode == GM_PLAY && g->time < 25.0f) {
+    if (g->mode == GM_PLAY && g->time < 30.0f) {
         font_text_center(W * 0.5f, H - 26.0f * ui, fs * 0.8f,
-                         "WASD move   SHIFT sprint   SPACE jump/vault   CTRL crouch   R roll   F5 debug",
+                         "WASD move  SHIFT sprint  SPACE jump  CTRL crouch  V roll  F/LMB fire  RMB/C aim  R reload  1/2/3 weapon",
                          0xC8FFFFFFu);
     }
 }
@@ -704,6 +1304,17 @@ void game_render(Game *g) {
     /* ── camera: first person, eye height eased by the controller ── */
     player_camera(&g->player, &g->cam_pos, &g->cam_dir);
     if (g->mode == GM_PHOTO) { /* M7 adds free-fly; M1 keeps the player camera */ }
+    /* recoil view punch: visual-only offset on top of the permanent climb
+       that combat already baked into pitch/yaw (decays at 10/s) */
+    if (g->rec_pitch != 0.0f || g->rec_yaw != 0.0f) {
+        Vec3 up = v3(0.0f, 1.0f, 0.0f);
+        Vec3 right = v3_norm(v3_cross(g->cam_dir, up));
+        Vec3 cup = v3_cross(right, g->cam_dir);
+        Vec3 d1 = v3_add(v3_mul(g->cam_dir, cosf(g->rec_yaw)),
+                         v3_mul(v3_cross(up, g->cam_dir), sinf(g->rec_yaw)));
+        g->cam_dir = v3_norm(v3_add(v3_mul(d1, cosf(g->rec_pitch)),
+                                    v3_mul(cup, sinf(g->rec_pitch))));
+    }
     Vec3 target = v3_add(g->cam_pos, g->cam_dir);
     g->view = m4_look_at(g->cam_pos, target, v3(0, 1, 0));
     float aspect = (float)g->w / (float)(g->h > 0 ? g->h : 1);
@@ -713,6 +1324,9 @@ void game_render(Game *g) {
     draw_sky(g);
     draw_terrain(g);
     draw_props(g);
+    draw_enemies(g);
+    draw_pickups(g);
+    draw_tracers_fx(g);
     draw_zips(g);
     draw_water(g);
 

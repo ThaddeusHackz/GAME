@@ -14,7 +14,7 @@
 #define DH_VERSION_MAJOR 0
 #define DH_VERSION_MINOR 2
 #define DH_VERSION_PATCH 0
-#define DH_BUILD_NAME    "M1 Traversal"
+#define DH_BUILD_NAME    "M2 Combat"
 
 #define DH_STR2(x) #x
 #define DH_STR(x)  DH_STR2(x)

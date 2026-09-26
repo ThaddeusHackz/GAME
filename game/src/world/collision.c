@@ -3,6 +3,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 #include "collision.h"
 #include <string.h>
+#include <math.h>
 
 void obstacles_init(ObstacleSet *s) { memset(s, 0, sizeof(*s)); }
 
@@ -158,4 +159,71 @@ int zip_nearest(const ZiplineSet *s, Vec3 chest, float reach,
     if (out_s) *out_s = bs;
     if (out_dist) *out_dist = best;
     return 1;
+}
+
+/* ── rays (M2: hitscan + AI line-of-sight) ─────────────────────────────── */
+/* Standard slab method vs AABB. dir must be normalized by the caller. */
+static int ray_aabb_n(Vec3 o, Vec3 d, Vec3 bmin, Vec3 bmax, float tmax,
+                    float *t_out, Vec3 *n_out)
+{
+    float t0 = 0.f, t1 = tmax;
+    int axis = -1; float sign = 0.f;
+    float po[3] = { o.x, o.y, o.z };
+    float pd[3] = { d.x, d.y, d.z };
+    float lo[3] = { bmin.x, bmin.y, bmin.z };
+    float hi[3] = { bmax.x, bmax.y, bmax.z };
+    for (int i = 0; i < 3; i++) {
+        if (fabsf(pd[i]) < 1e-8f) {
+            if (po[i] < lo[i] || po[i] > hi[i]) return 0;
+            continue;
+        }
+        float inv = 1.f / pd[i];
+        float ta = (lo[i] - po[i]) * inv;
+        float tb = (hi[i] - po[i]) * inv;
+        float nsign = -1.f;
+        if (ta > tb) { float tt = ta; ta = tb; tb = tt; nsign = 1.f; }
+        if (ta > t0) { t0 = ta; axis = i; sign = nsign * (inv < 0.f ? -1.f : 1.f); }
+        if (tb < t1) t1 = tb;
+        if (t0 > t1) return 0;
+    }
+    if (axis < 0) {
+        /* origin inside the box: report a zero-distance hit, no face */
+        if (t_out) *t_out = 0.f;
+        if (n_out) *n_out = v3(0.f, 1.f, 0.f);
+        return 1;
+    }
+    if (t_out) *t_out = t0;
+    if (n_out) {
+        Vec3 n = v3(0.f, 0.f, 0.f);
+        if (axis == 0) n.x = sign; else if (axis == 1) n.y = sign; else n.z = sign;
+        *n_out = n;
+    }
+    return 1;
+}
+
+int obstacles_ray_hit(const ObstacleSet *s, Vec3 o, Vec3 d, float tmax,
+                      float *t_out, Vec3 *n_out)
+{
+    if (!s || !(tmax > 0.f)) return 0;
+    int hit = 0; float best = tmax; Vec3 bn = v3(0.f, 1.f, 0.f);
+    for (int i = 0; i < s->count; i++) {
+        const Obstacle *b = &s->ob[i];
+        if (b->kind != 0) continue;             /* ladders/vault volumes: bullets pass */
+        float t; Vec3 n;
+        if (ray_aabb_n(o, d, b->min, b->max, best, &t, &n)) {
+            best = t; bn = n; hit = 1;
+        }
+    }
+    if (hit) { if (t_out) *t_out = best; if (n_out) *n_out = bn; }
+    return hit;
+}
+
+int obstacles_segment_clear(const ObstacleSet *s, Vec3 a, Vec3 b)
+{
+    Vec3 d = v3_sub(b, a);
+    float len = v3_len(d);
+    if (len < 1e-6f) return 1;
+    d = v3_mul(d, 1.f / len);
+    float t;
+    return obstacles_ray_hit(s, a, d, len, &t, NULL) ? 0 : 1;
 }

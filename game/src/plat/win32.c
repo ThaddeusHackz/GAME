@@ -58,10 +58,15 @@ static uint32_t key_buttons(const WinState *w) {
     if (w->key[VK_SPACE])    b |= BTN_JUMP;
     if (w->key[VK_SHIFT])    b |= BTN_SPRINT;
     if (w->key[VK_CONTROL])  b |= BTN_CROUCH;
-    if (w->key['R'])         b |= BTN_ROLL;
+    if (w->key['V'])         b |= BTN_ROLL;      /* M2: R became reload (genre standard) */
+    if (w->key['R'])         b |= BTN_RELOAD;
     if (w->key['E'])         b |= BTN_USE;
     if (w->key['F'])         b |= BTN_FIRE;
     if (w->key['C'])         b |= BTN_AIM;
+    if (w->key['1'])         b |= BTN_SLOT1;
+    if (w->key['2'])         b |= BTN_SLOT2;
+    if (w->key['3'])         b |= BTN_SLOT3;
+    if (w->key['G'])         b |= BTN_ARENA;
     if (w->key['P'])         b |= BTN_PHOTO;
     if (w->key[VK_TAB])      b |= BTN_MAP;
     if (w->key[VK_ESCAPE])   b |= BTN_MENU;
@@ -84,9 +89,14 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (!w->key[wp]) {
                 /* one-frame edges for the verbs that are presses, not holds */
                 if (wp == VK_SPACE) w->edge |= BTN_JUMP;
-                if (wp == 'R')      w->edge |= BTN_ROLL;
+                if (wp == 'V')      w->edge |= BTN_ROLL;
+                if (wp == 'R')      w->edge |= BTN_RELOAD;
                 if (wp == 'E')      w->edge |= BTN_USE;
                 if (wp == 'P')      w->edge |= BTN_PHOTO;
+                if (wp == '1')      w->edge |= BTN_SLOT1;
+                if (wp == '2')      w->edge |= BTN_SLOT2;
+                if (wp == '3')      w->edge |= BTN_SLOT3;
+                if (wp == 'G')      w->edge |= BTN_ARENA;
                 if (wp == VK_ESCAPE) w->edge |= BTN_MENU;
             }
             w->key[wp] = 1;

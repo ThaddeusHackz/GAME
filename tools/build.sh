@@ -52,6 +52,8 @@ GAME_SRC=(
   "$GAME/src/world/terrain.c"
   "$GAME/src/world/collision.c"
   "$GAME/src/player/player.c"
+  "$GAME/src/combat/weapon.c"
+  "$GAME/src/ai/enemy.c"
   "$GAME/src/game/game.c"
 )
 PLAT_SRC_LINUX=(
@@ -101,6 +103,10 @@ build_test() {
   compile_host "$exe2" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
       "$GAME/tests/smoke_traversal.c" || { echo "compile FAILED"; return 1; }
   run_smoke "$exe2" || rc=1
+  local exe3="$BUILD/dh_smoke_combat"
+  compile_host "$exe3" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/tests/smoke_combat.c" || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe3" || rc=1
   return $rc
 }
 
@@ -200,8 +206,12 @@ build_zip() {
   local ver
   ver=$(grep -o 'DH_VERSION_MAJOR [0-9]*' "$GAME/src/core/dh_types.h" | awk '{print $2}')
   local name="DividedHorizon-v${ver}-win64.zip"
-  ( cd "$DIST" && zip -q -9 "$name" DividedHorizon.exe ../LICENSES.md ../README.md 2>/dev/null \
-      || zip -q -9 "$name" DividedHorizon.exe )
+  rm -f "$DIST/$name"
+  ( cd "$DIST" && zip -q -9 "$name" DividedHorizon.exe )
+  # docs + balance table ship NEXT TO the exe (data dir resolves to ".")
+  ( cd "$ROOT" && [ -f LICENSES.md ] && zip -q -9 "$DIST/$name" LICENSES.md )
+  ( cd "$ROOT" && [ -f README.md ]   && zip -q -9 "$DIST/$name" README.md )
+  ( cd "$GAME/data" && [ -f weapons.json ] && zip -q -9 "$DIST/$name" weapons.json )
   echo "   ✓ dist/$name ($(du -h "$DIST/$name" | cut -f1))"
 }
 

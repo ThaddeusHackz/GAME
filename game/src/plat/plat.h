@@ -33,6 +33,10 @@
 #define BTN_DOWN    (1u << 15)
 #define BTN_LEFT    (1u << 16)
 #define BTN_RIGHT   (1u << 17)
+#define BTN_SLOT1   (1u << 18)   /* M2: weapon slots (sidearm / primary1 / primary2) */
+#define BTN_SLOT2   (1u << 19)
+#define BTN_SLOT3   (1u << 20)
+#define BTN_ARENA   (1u << 21)   /* M2: deploy to the combat arena (dev/DoD) */
 
 typedef struct {
     uint32_t buttons;        /* held this frame */

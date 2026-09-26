@@ -35,6 +35,7 @@ typedef struct {
     const char *shot_dir;
     int   no_pacing;           /* run flat out (benchmarks / CI) */
     int   verbose;
+    int   arena;               /* M2: start in the combat arena with N hostiles (0=off) */
 } LaunchOpts;
 
 static void usage(void) {
@@ -51,6 +52,7 @@ static void usage(void) {
 "  --soft              force the CPU rasterizer even if GL11 is available\n"
 "  --gl                force the GL11 backend\n"
 "  --menu              start on the title screen instead of in play\n"
+"  --arena [n]         start in the M2 combat arena vs n hostiles (default 30)\n"
 "  --fast              no frame pacing (benchmark)\n"
 "  -v, --verbose       debug logging to stdout\n"
 "  -h, --help          this text\n");
@@ -69,6 +71,13 @@ static int parse_args(int argc, char **argv, LaunchOpts *o) {
         if (!strcmp(a, "--headless")) o->headless = 1;
         else if (!strcmp(a, "--menu")) o->menu_first = 1;
         else if (!strcmp(a, "--fast")) o->no_pacing = 1;
+        else if (!strcmp(a, "--arena")) {
+            o->arena = 30;                       /* optional count arg (peeks, never swallows a flag) */
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                o->arena = atoi(argv[++i]);
+                if (o->arena <= 0) o->arena = 30;
+            }
+        }
         else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) o->verbose = 1;
         else if (!strcmp(a, "-h") || !strcmp(a, "--help")) { usage(); return 0; }
         else if (!strcmp(a, "--soft")) o->backend = REND_SOFT;
@@ -136,6 +145,7 @@ int main(int argc, char **argv) {
     }
     if (!o.menu_first && o.headless) game_start_play(&game);
     if (o.menu_first) game.mode = GM_MENU;
+    if (o.arena > 0) game_arena_start(&game, o.arena);   /* M2 combat DoD arena */
 
     /* ── main loop ── */
     PlatInput in;

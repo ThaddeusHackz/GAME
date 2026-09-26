@@ -45,6 +45,15 @@ float obstacles_support(const ObstacleSet *s, Vec3 pos, float radius, float feet
 int   obstacles_step_onto(const ObstacleSet *s, Vec3 *pos, float radius,
                           float top, float amount);
 
+/* ── rays (M2 hitscan + AI line-of-sight) ─────────────────────────────────
+   Nearest solid-kind AABB hit along ray o + t·d, t ∈ (0, tmax]. Writes the
+   hit distance and face normal. Returns 1 on hit. (Slab method, no allocs.) */
+int   obstacles_ray_hit(const ObstacleSet *s, Vec3 o, Vec3 d, float tmax,
+                        float *t_out, Vec3 *n_out);
+/* 1 when no solid box intersects segment a→b (AI line-of-sight against
+   buildings/crates; terrain occlusion is sampled separately). */
+int   obstacles_segment_clear(const ObstacleSet *s, Vec3 a, Vec3 b);
+
 /* ── ziplines (6.1) ─────────────────────────────────────────────────────────
    A zipline is a straight cable between two anchors. The player rides it as a
    1-D arc-length parameter with gravity-along-cable acceleration and a soft
