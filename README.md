@@ -19,11 +19,12 @@ dependencies).
 | **M1 — Traversal** | ✅ run/jump/vault/mantle/ledge/zipline/swim over a 1 km² streaming island, 69-check traversal smoke |
 | **M2 — Combat** | ✅ data-driven weapons, enemy FSM + detection, 30-enemy arena, 112-check combat smoke |
 | **M3 — Island Slice** | ✅ outpost capture (stealth/loud/mixed), signal mast, wildlife, day/night, fog-of-war minimap, binoculars, 82-check island smoke |
-| M4–M13 | not started |
+| **M4 — City Slice** | ✅ Meridian City: 8 blocks + harbor, 5 data-driven vehicles, 15 traffic cars, 30 peds, heat 0-5 with cruisers + heli, odd job, hot-dog economy, ferry between acts, 154-check city smoke |
+| M5–M13 | not started |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is
-gated by headless smoke tests (`tools/build.sh test`, currently **348 checks**)
+gated by headless smoke tests (`tools/build.sh test`, currently **502 checks**)
 and a structurally-verified Win64 cross-build; see `docs/reports/`.
 
 ## Build
@@ -73,3 +74,22 @@ docs/reports/      per-milestone honest status reports
   that persist and are covered by the smoke test.
 
 See `MASTER_PROMPT.md` for the full design doctrine (Parts I–X).
+
+
+## Controls (keyboard + mouse)
+
+| Key | On foot | Driving |
+|---|---|---|
+| WASD | move | W throttle · S brake/reverse · A/D steer |
+| Mouse | look | look around |
+| Shift / Ctrl / Space / V | sprint / crouch / jump-vault / roll | Space = handbrake drift |
+| F or LMB / C or RMB / R | fire / aim / reload | — |
+| 1 2 3 | weapon slots | — |
+| E | interact · enter car (carjack) · buy hot dog · job board | exit (below 3 m/s) |
+| T / B | takedown / binoculars (hold) | — |
+| Q | — | cycle radio (station names; audio arrives in M7) |
+| K | Beto's ferry: Isla Sombra <-> Meridian City (not while wanted) | |
+| G | combat arena (island, dev) | |
+| P / Tab / Esc | photo mode / debug overlay / pause | |
+
+Launch flags: `--outpost` (island capture DoD), `--city` (start in Meridian), `--night`, `--arena [n]`, `--headless`.

@@ -19,6 +19,7 @@
 #include "../plat/plat.h"
 #include "../combat/weapon.h"
 #include "../ai/enemy.h"
+#include "../city/city.h"
 
 #define GAME_MAX_PROPS 640
 
@@ -109,7 +110,7 @@ typedef struct {
 } Tracer;
 typedef struct { Tracer v[TRACER_MAX]; int count; } TracerSet;
 
-typedef struct {
+typedef struct Game {
     /* ── world ── */
     Terrain      terrain;
     ObstacleSet  obs;
@@ -191,6 +192,12 @@ typedef struct {
     int          tagged_count;            /* enemies currently tagged */
     float        melee_cd;                /* takedown/swing cooldown */
 
+    /* ── city act (M4, Spec 16) ── */
+    int          act;            /* 0 = Isla Sombra · 1 = Meridian City */
+    City         city;
+    int          in_vehicle;     /* index into city.veh, -1 on foot */
+    int          cash;           /* $ — jobs, looted wallets; hot dogs cost 5 */
+
     /* ── perf / config ── */
     float        fps_smooth;
     float        sim_ms, render_ms;
@@ -218,6 +225,14 @@ void  game_set_time(Game *g, float day_t);
 void  game_frame(Game *g, const PlatInput *in, float dt);   /* simulate only */
 void  game_render(Game *g);                                 /* submit + draw */
 void  game_message(Game *g, const char *fmt, ...);
+/* M4: act-II world swap (Spec 4.3 — one streaming world per act). Frees the
+   island world and rebuilds Meridian City on the same heightfield footprint. */
+void  game_load_city(Game *g);
+void  game_load_island(Game *g);   /* ferry back to act I */
+/* Public wrappers over the static FX helpers (city.c and future acts use them). */
+void  game_fx(Game *g, Vec3 pos, Vec3 dir, int n, uint32_t color,
+              float speed, float life, int kind);
+void  game_tracer(Game *g, Vec3 a, Vec3 b, uint32_t color);
 void  game_apply_settings(Game *g);
 const char *game_mode_name(GameMode m);
 /* Traversal-course element table (also printed in the M1 report). */

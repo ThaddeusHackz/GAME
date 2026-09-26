@@ -38,6 +38,8 @@
 #define BTN_SLOT3   (1u << 20)
 #define BTN_ARENA   (1u << 21)   /* M2: deploy to the combat arena (dev/DoD) */
 #define BTN_BINOC   (1u << 22)   /* M3: binoculars (hold) — scout + tag (§44) */
+#define BTN_RADIO   (1u << 23)   /* M4: cycle radio station while driving */
+#define BTN_FERRY   (1u << 24)   /* M4: Beto's ferry - travel island <-> city */
 
 typedef struct {
     uint32_t buttons;        /* held this frame */

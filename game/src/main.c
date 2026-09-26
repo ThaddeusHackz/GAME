@@ -38,6 +38,7 @@ typedef struct {
     int   arena;               /* M2: start in the combat arena with N hostiles (0=off) */
     int   outpost;             /* M3: start at the outpost DoD beach (0=off) */
     int   night;               /* M3: begin at night to show the day/night cycle */
+    int   city;                /* M4: boot straight into Meridian City (act II) */
 } LaunchOpts;
 
 static void usage(void) {
@@ -57,6 +58,7 @@ static void usage(void) {
 "  --arena [n]         start in the M2 combat arena vs n hostiles (default 30)\n"
 "  --outpost           start at the M3 island outpost (scout/capture DoD)\n"
 "  --night             begin the day/night cycle at night\n"
+"  --city              start in Meridian City (M4 act II: cars, heat, hot dogs)\n"
 "  --fast              no frame pacing (benchmark)\n"
 "  -v, --verbose       debug logging to stdout\n"
 "  -h, --help          this text\n");
@@ -84,6 +86,7 @@ static int parse_args(int argc, char **argv, LaunchOpts *o) {
         }
         else if (!strcmp(a, "--outpost")) o->outpost = 1;
         else if (!strcmp(a, "--night"))   o->night = 1;
+        else if (!strcmp(a, "--city"))    o->city = 1;
         else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) o->verbose = 1;
         else if (!strcmp(a, "-h") || !strcmp(a, "--help")) { usage(); return 0; }
         else if (!strcmp(a, "--soft")) o->backend = REND_SOFT;
@@ -154,6 +157,7 @@ int main(int argc, char **argv) {
     if (o.outpost) game_outpost_start(&game);            /* M3 island DoD beach */
     if (o.arena > 0) game_arena_start(&game, o.arena);   /* M2 combat DoD arena */
     if (o.night) game_set_time(&game, 0.78f);            /* ~00:43 — moonlit */
+    if (o.city) { game_start_play(&game); game_load_city(&game); }   /* M4 act II */
 
     /* ── main loop ── */
     PlatInput in;

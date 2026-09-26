@@ -197,6 +197,9 @@ int terrain_build_chunks(Terrain *t, float chunk_m) {
                     float steep = terrain_steepness(t, wx, wz);
                     uint32_t c = 0xFFFFFFFFu;
                     mat_color(terrain_material(t, wx, wz), steep, h, t->max_height, &c);
+                    if (t->paint_x1 > t->paint_x0 && wx >= t->paint_x0 && wx <= t->paint_x1 &&
+                        wz >= t->paint_z0 && wz <= t->paint_z1 && h >= t->paint_min_h)
+                        c = t->paint_col;
                     if (!m->col) {
                         m->col = (uint32_t*)calloc((size_t)vper*vper, 4);
                         if (!m->col) { mesh_free(m); m = NULL; break; }

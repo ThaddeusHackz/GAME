@@ -21,6 +21,10 @@ typedef struct {
     int      chunk_ids[TERRAIN_MAX_CHUNK_IDS];
     int      chunk_count;
     float    chunk_m;
+    /* M4: urban paint — samples inside this XZ rect (and above paint_min_h)
+       get the asphalt colour instead of the biome colour. 0 size = off. */
+    float    paint_x0, paint_z0, paint_x1, paint_z1, paint_min_h;
+    uint32_t paint_col;
 } Terrain;
 
 /* Generate island: fbm continents + radial falloff so the rim is beach/sea. */

@@ -54,6 +54,9 @@ GAME_SRC=(
   "$GAME/src/player/player.c"
   "$GAME/src/combat/weapon.c"
   "$GAME/src/ai/enemy.c"
+  "$GAME/src/city/vehicle.c"
+  "$GAME/src/city/heat.c"
+  "$GAME/src/city/city.c"
   "$GAME/src/game/game.c"
 )
 PLAT_SRC_LINUX=(
@@ -93,7 +96,7 @@ compile_host() {
 }
 
 build_test() {
-  echo "══ [1/4] Linux headless test build (gcc) ══"
+  echo "══ [1/5] Linux headless test build (gcc) ══"
   local rc=0
   local exe="$BUILD/dh_smoke"
   compile_host "$exe" "${CORE_SRC[@]}" "$GAME/tests/smoke_core.c" \
@@ -111,6 +114,10 @@ build_test() {
   compile_host "$exe4" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
       "$GAME/tests/smoke_island.c" || { echo "compile FAILED"; return 1; }
   run_smoke "$exe4" || rc=1
+  local exe5="$BUILD/dh_smoke_city"
+  compile_host "$exe5" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/tests/smoke_city.c" || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe5" || rc=1
   return $rc
 }
 
@@ -207,6 +214,11 @@ build_windows() {
 # ── dist zip ──────────────────────────────────────────────────────────────
 build_zip() {
   echo "══ packaging dist/DividedHorizon-*.zip ══"
+  if [ ! -f "$DIST/DividedHorizon.exe" ]; then
+    echo "   BLOCKED: no DividedHorizon.exe - refusing to ship a zip without the game (Spec 17.3)"
+    rm -f "$DIST"/DividedHorizon-*.zip
+    return 1
+  fi
   local ver
   ver=$(grep -o 'DH_VERSION_MAJOR [0-9]*' "$GAME/src/core/dh_types.h" | awk '{print $2}')
   local name="DividedHorizon-v${ver}-win64.zip"
@@ -216,6 +228,7 @@ build_zip() {
   ( cd "$ROOT" && [ -f LICENSES.md ] && zip -q -9 "$DIST/$name" LICENSES.md )
   ( cd "$ROOT" && [ -f README.md ]   && zip -q -9 "$DIST/$name" README.md )
   ( cd "$GAME/data" && [ -f weapons.json ] && zip -q -9 "$DIST/$name" weapons.json )
+  ( cd "$GAME/data" && [ -f vehicles.json ] && zip -q -9 "$DIST/$name" vehicles.json )
   echo "   ✓ dist/$name ($(du -h "$DIST/$name" | cut -f1))"
 }
 

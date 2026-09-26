@@ -69,6 +69,8 @@ static uint32_t key_buttons(const WinState *w) {
     if (w->key['G'])         b |= BTN_ARENA;
     if (w->key['T'])         b |= BTN_MELEE;     /* M3: takedown / melee */
     if (w->key['B'])         b |= BTN_BINOC;     /* M3: binoculars (hold) */
+    if (w->key['Q'])         b |= BTN_RADIO;     /* M4: cycle radio (in cars) */
+    if (w->key['K'])         b |= BTN_FERRY;     /* M4: ferry island <-> city */
     if (w->key['P'])         b |= BTN_PHOTO;
     if (w->key[VK_TAB])      b |= BTN_MAP;
     if (w->key[VK_ESCAPE])   b |= BTN_MENU;
@@ -100,6 +102,8 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 if (wp == '3')      w->edge |= BTN_SLOT3;
                 if (wp == 'G')      w->edge |= BTN_ARENA;
                 if (wp == 'T')      w->edge |= BTN_MELEE;
+                if (wp == 'Q')      w->edge |= BTN_RADIO;
+                if (wp == 'K')      w->edge |= BTN_FERRY;
                 if (wp == VK_ESCAPE) w->edge |= BTN_MENU;
             }
             w->key[wp] = 1;

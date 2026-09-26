@@ -326,6 +326,15 @@ static void fx_spawn(Game *g, Vec3 pos, Vec3 dir, int n, uint32_t color,
     }
 }
 
+/* Public FX wrappers (M4): city.c and future acts reuse the same helpers. */
+void game_fx(Game *g, Vec3 pos, Vec3 dir, int n, uint32_t color,
+             float speed, float life, int kind) {
+    fx_spawn(g, pos, dir, n, color, speed, life, kind);
+}
+void game_tracer(Game *g, Vec3 a, Vec3 b, uint32_t color) {
+    tracer_add(g, a, b, color);
+}
+
 static void fx_update(Game *g, float dt)
 {
     for (int i = 0; i < g->fx_count; ) {
@@ -1450,8 +1459,10 @@ static void combat_update(Game *g, const PlatInput *in, float dt)
     }
 
     /* ── M3 island systems: outpost FSM, wildlife ── */
-    island_update(g, in, dt);
-    critters_update(g, dt);
+    if (g->act == 0) {           /* M4: island systems only run in act I */
+        island_update(g, in, dt);
+        critters_update(g, dt);
+    }
 }
 
 /* ── combat rendering ───────────────────────────────────────────────────── */
@@ -1683,6 +1694,175 @@ void game_apply_settings(Game *g) {
 
 /* ══════════════════════════════ lifecycle ═══════════════════════════════ */
 
+/* ══════════════════════ act II: Meridian City (M4) ══════════════════════
+   Spec 4.3 keeps ONE streaming world per act: loading the city frees the
+   island content and rebuilds on the same heightfield footprint. Static
+   geometry lives here (it needs prop_box/prop_visual); the living city is
+   city.c. */
+
+static void city_paint_map(Game *g) {
+    float cell = WORLD_SIZE / (float)MAPW;
+    for (int rz = 0; rz < MAPW; rz++)
+        for (int cx = 0; cx < MAPW; cx++) {
+            float wx = (cx + 0.5f) * cell, wz = (rz + 0.5f) * cell;
+            int f = city_feature_at(&g->city, wx, wz);
+            float r, gg, b;
+            if (f == 1)      { r = 58.f;  gg = 58.f;  b = 64.f;  }  /* asphalt */
+            else if (f == 2) { r = 96.f;  gg = 84.f;  b = 70.f;  }  /* blocks  */
+            else if (f == 3) { r = 40.f;  gg = 92.f;  b = 130.f; }  /* harbor  */
+            else {
+                float h = terrain_height(&g->terrain, wx, wz);
+                if (h < 0.6f) { r = 44.f; gg = 112.f; b = 142.f; }
+                else          { r = 78.f; gg = 132.f; b = 62.f;  }
+            }
+            g->map_cell[rz * MAPW + cx] = 0xFF000000u |
+                (((uint32_t)b & 255u) << 16) | (((uint32_t)gg & 255u) << 8) |
+                ((uint32_t)r & 255u);
+        }
+}
+
+static void city_build_props(Game *g) {
+    City *c = &g->city;
+    Rng *r = &g->rng;
+    /* 8 blocks × 4 buildings — downtown (north row) grows towers (§6 stylized) */
+    static const uint32_t FACADE[5] = {
+        0xFF8A8478u, 0xFF9A9080u, 0xFF706A64u, 0xFFA09888u, 0xFF5E6A72u
+    };
+    for (int i = 0; i < CITY_BLOCKS; i++) {
+        Vec2 bc = c->blocks[i];
+        int downtown = (bc.y < 500.0f);
+        for (int k = 0; k < 4; k++) {
+            float ox = ((k & 1) ? 1.0f : -1.0f) * (11.0f + rng_f(r) * 3.0f);
+            float oz = ((k & 2) ? 1.0f : -1.0f) * (24.0f + rng_f(r) * 14.0f);
+            float hx = 8.0f + rng_f(r) * 3.5f;
+            float hz = 12.0f + rng_f(r) * 8.0f;
+            float hh = (downtown ? 16.0f : 8.0f) + rng_f(r) * (downtown ? 26.0f : 12.0f);
+            Vec3 ctr = v3(bc.x + ox, CITY_GROUND_Y + hh * 0.5f, bc.y + oz);
+            uint32_t col = FACADE[(int)(rng_f(r) * 5.0f) % 5];
+            prop_box(g, ctr, v3(hx, hh * 0.5f, hz), proc_tex.concrete, col, 0);
+            if (k & 1)             /* rooftop unit (deterministic count) */
+                prop_visual(g, v3(ctr.x + hx * 0.3f, CITY_GROUND_Y + hh + 0.6f, ctr.z),
+                            v3(1.6f, 0.6f, 1.6f), proc_tex.metal, 0xFF707478u, 0, 0);
+        }
+        /* sidewalk slab (draw-only curb) */
+        prop_visual(g, v3(bc.x, CITY_GROUND_Y + 0.10f, bc.y),
+                    v3(c->block_rx + 2.5f, 0.10f, c->block_rz + 2.5f),
+                    proc_tex.concrete, 0xFF7A766Eu, 0, 0);
+    }
+    for (int i = 0; i < 3; i++) {     /* lane stripes */
+        prop_visual(g, v3(c->avenues[i], CITY_GROUND_Y + 0.05f, 500.f), v3(0.12f, 0.02f, 128.f),
+                    -1, 0xFF50C8E8u, 0, 0);
+        prop_visual(g, v3(500.f, CITY_GROUND_Y + 0.05f, c->streets[i]), v3(128.f, 0.02f, 0.12f),
+                    -1, 0xFF50C8E8u, 0, 0);
+    }
+    /* harbor stub: boardwalk + two warehouses + pilings */
+    prop_box(g, v3(500.f, 3.7f, 651.f), v3(60.f, 0.2f, 9.f), proc_tex.wood, 0xFF9A8A70u, 0);
+    prop_box(g, v3(432.f, CITY_GROUND_Y + 4.f, 642.f), v3(14.f, 4.f, 8.f),
+             proc_tex.metal, 0xFF6A7A82u, 0);
+    prop_box(g, v3(568.f, CITY_GROUND_Y + 4.f, 642.f), v3(14.f, 4.f, 8.f),
+             proc_tex.metal, 0xFF7A6A62u, 0);
+    for (int i = 0; i < 7; i++)
+        prop_visual(g, v3(448.f + i * 17.f, 1.8f, 658.f), v3(0.5f, 2.f, 0.5f),
+                    proc_tex.wood, 0xFF6A5A48u, 0, 0);
+    /* job board + hot-dog stand (interactables; city.c checks the ranges) */
+    prop_visual(g, v3(c->job_board.x, CITY_GROUND_Y + 1.5f, c->job_board.z),
+                v3(1.3f, 0.9f, 0.08f), proc_tex.wood, 0xFFC8B890u, 0, 0);
+    prop_visual(g, v3(c->job_board.x - 1.1f, CITY_GROUND_Y + 0.8f, c->job_board.z),
+                v3(0.08f, 0.8f, 0.08f), proc_tex.wood, 0xFF8A7A60u, 0, 0);
+    prop_visual(g, v3(c->job_board.x + 1.1f, CITY_GROUND_Y + 0.8f, c->job_board.z),
+                v3(0.08f, 0.8f, 0.08f), proc_tex.wood, 0xFF8A7A60u, 0, 0);
+    prop_visual(g, v3(c->hotdog_stand.x, CITY_GROUND_Y + 0.55f, c->hotdog_stand.z),
+                v3(0.9f, 0.55f, 0.5f), proc_tex.metal, 0xFFD0D4D8u, 0, 0);
+    prop_visual(g, v3(c->hotdog_stand.x, CITY_GROUND_Y + 2.1f, c->hotdog_stand.z),
+                v3(1.5f, 0.06f, 1.5f), proc_tex.fabric, 0xFF5050C0u, 1, 0);
+    prop_visual(g, v3(c->hotdog_stand.x + 1.2f, CITY_GROUND_Y + 1.05f, c->hotdog_stand.z),
+                v3(0.05f, 1.05f, 0.05f), proc_tex.metal, 0xFF909498u, 0, 0);
+    /* invisible boundary walls (traffic/peds/player stay in the slice) */
+    obstacles_add_box(&g->obs, v3(362.f, 8.f, 500.f), v3(2.f, 8.f, 145.f), 0);
+    obstacles_add_box(&g->obs, v3(638.f, 8.f, 500.f), v3(2.f, 8.f, 145.f), 0);
+    obstacles_add_box(&g->obs, v3(500.f, 8.f, 361.f), v3(145.f, 8.f, 2.f), 0);
+    obstacles_add_box(&g->obs, v3(401.f, 8.f, 646.f), v3(41.f, 8.f, 1.5f), 0);
+    obstacles_add_box(&g->obs, v3(599.f, 8.f, 646.f), v3(41.f, 8.f, 1.5f), 0);
+    obstacles_add_box(&g->obs, v3(500.f, 5.f, 661.f), v3(60.f, 1.2f, 0.4f), 0); /* boardwalk rail */
+}
+
+void game_load_city(Game *g) {
+    if (!g || !g->ready) return;
+    DH_INFO("game", "loading act II: Meridian City (world swap, Spec 4.3)");
+    g->act = 1;
+    g->in_vehicle = -1;
+    /* clear act-I dynamic content */
+    g->enemies.count = 0; g->enemies.alive_count = 0;
+    g->critter_count = 0;
+    g->pickups.count = 0;
+    g->tracers.count = 0;
+    g->fx_count = 0;
+    g->outpost.built = 0;
+    g->arena_active = 0; g->arena_total = 0;
+    g->prop_count = 0;
+    g->zips.count = 0;
+    obstacles_init(&g->obs);
+    /* rebuild the heightfield: bay water, city plate, harbor channel */
+    terrain_release_chunks(&g->terrain);
+    terrain_init(&g->terrain, WORLD_RES, WORLD_SIZE, g->seed);
+    terrain_flatten(&g->terrain, v3(500.f, 0.f, 500.f), 500.f, 500.f, -2.0f, 20.f);
+    terrain_flatten(&g->terrain, v3(500.f, 0.f, 500.f), 190.f, 190.f, CITY_GROUND_Y, 12.f);
+    terrain_flatten(&g->terrain, v3(500.f, 0.f, 716.f), 190.f, 66.f, -1.4f, 10.f);
+    g->terrain.paint_x0 = 300.f; g->terrain.paint_x1 = 700.f;
+    g->terrain.paint_z0 = 300.f; g->terrain.paint_z1 = 700.f;
+    g->terrain.paint_min_h = 3.0f;
+    g->terrain.paint_col = 0xFF5A5652u;          /* warm-grey asphalt (§43.3 no brown soup) */
+    terrain_build_chunks(&g->terrain, CHUNK_M);
+    city_init(&g->city, g);
+    city_build_props(g);
+    city_paint_map(g);
+    memset(g->fog, 0, sizeof g->fog);
+    g->spawn = g->city.player_spawn;
+    player_respawn(&g->player, g->spawn);
+    g->player.yaw = 3.14159265f;   /* face the skyline, harbor at your back */
+    g->player.health = 100.f;
+    g->respawn_t = 0.f;
+    g->damage_flash = 0.f;
+    game_set_time(g, g->day_t);
+    game_message(g, "MERIDIAN CITY - ACT II. STEAL A CAR, LOSE THE HEAT, EAT.");
+    g->message_t = 5.0f;
+}
+
+/* Return trip on Beto's ferry: rebuild act I exactly as game_init does
+   (same seed = same island). Inventory and cash ride along; the outpost
+   and wildlife reset (world persistence is M5 save-state work). */
+void game_load_island(Game *g) {
+    if (!g || !g->ready) return;
+    DH_INFO("game", "loading act I: Isla Sombra (ferry return)");
+    g->act = 0;
+    g->in_vehicle = -1;
+    g->city.built = 0;
+    g->prop_count = 0;
+    terrain_release_chunks(&g->terrain);
+    terrain_init(&g->terrain, WORLD_RES, WORLD_SIZE, g->seed);
+    g->terrain.paint_x1 = g->terrain.paint_x0 = 0.f;
+    terrain_flatten(&g->terrain, g->course_center, 70.0f, 52.0f, g->pad_h, 12.0f);
+    terrain_flatten(&g->terrain, v3(150.0f, 0.0f, 620.0f), 60.0f, 45.0f, 1.2f, 25.0f);
+    obstacles_init(&g->obs);
+    zips_init(&g->zips);
+    build_traversal_course(g);
+    enemies_init(&g->enemies);
+    g->pickups.count = 0; g->tracers.count = 0; g->fx_count = 0;
+    g->arena_active = 0; g->arena_total = 0;
+    build_combat_arena(g);
+    memset(&g->outpost, 0, sizeof g->outpost);
+    build_island(g);
+    terrain_build_chunks(&g->terrain, CHUNK_M);
+    g->spawn = v3(150.0f, 0.0f, 620.0f);          /* Beto drops you on the west beach */
+    g->spawn.y = terrain_height(&g->terrain, g->spawn.x, g->spawn.z) + 0.1f;
+    player_respawn(&g->player, g->spawn);
+    g->player.zips = &g->zips;
+    g->player.yaw = 1.5708f;
+    g->player.health = 100.f;
+    game_message(g, "ISLA SOMBRA - BETO'S FERRY DROPS YOU ON THE WEST BEACH");
+    g->message_t = 4.0f;
+}
+
 int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     if (!g) return 0;
     memset(g, 0, sizeof(*g));
@@ -1694,6 +1874,9 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     g->show_debug = 1;
     g->show_hud = 1;
     g->ocean_tile = OCEAN_TILE;
+    g->act = 0;
+    g->in_vehicle = -1;
+    g->cash = 0;
 
     settings_defaults(settings());
     settings_load(settings());          /* keeps user prefs across runs (6.11) */
@@ -1853,7 +2036,15 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
     int mantles_before = g->player.stats.mantles + g->player.stats.vaults;
     float health_before = g->player.health;
 
-    player_input(&g->player, &pi, dt);
+    int driving = (g->act == 1 && g->in_vehicle >= 0);
+    if (driving) {
+        /* M4: the vehicle owns the body; the player only looks around (arcade
+           driving, Section 38 — no on-foot physics while seated). */
+        g->player.yaw += pi.look_dx;
+        g->player.pitch = dh_clampf(g->player.pitch + pi.look_dy, -1.45f, 1.45f);
+    } else {
+        player_input(&g->player, &pi, dt);
+    }
 
     /* ── feedback on notable events (M2 replaces this with SFX/particles) ── */
     (void)jumps_before;
@@ -1887,6 +2078,10 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
         g->damage_flash = 1.0f;
         if (g->respawn_t > 2.5f) {
             g->respawn_t = 0.0f;
+            if (g->act == 1 && g->in_vehicle >= 0) {   /* die driving = wake up on foot */
+                g->city.veh[g->in_vehicle].state = VS_PARKED;
+                g->in_vehicle = -1;
+            }
             player_respawn(&g->player, g->spawn);
             g->damage_flash = 0.0f;
             g->reloading = 0;
@@ -1898,6 +2093,9 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
         g->respawn_t = 0.0f;
     }
 
+    /* ── M4: Meridian City lives when act II is loaded ── */
+    if (g->act == 1) city_frame(&g->city, g, in, dt);
+
     /* ── photo mode / debug toggles ── */
     if (in->pressed & BTN_PHOTO) {
         g->mode = (g->mode == GM_PHOTO) ? GM_PLAY : GM_PHOTO;
@@ -1906,8 +2104,19 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
     if (in->pressed & BTN_MAP) { g->show_debug = !g->show_debug; }
 
     /* M2 dev/DoD hotkey: deploy to the combat arena (30 hostiles) */
-    if (in->pressed & BTN_ARENA) {
+    if (in->pressed & BTN_ARENA && g->act == 0) {
         game_arena_start(g, 30);
+    }
+    /* M4: Beto's ferry (Spec 4.3 act travel). Blocked while wanted. */
+    if (in->pressed & BTN_FERRY) {
+        if (g->act == 1 && g->city.heat.stars > 0) {
+            game_message(g, "BETO WON'T SAIL WITH COPS ON YOUR TAIL - LOSE THE HEAT");
+            g->message_t = 3.0f;
+        } else if (g->act == 0) {
+            game_load_city(g);
+        } else {
+            game_load_island(g);
+        }
     }
 }
 
@@ -2075,6 +2284,16 @@ static void draw_minimap(Game *g) {
         if (e->tagged && e->state != EN_DEAD)
             MM_ICON(e->pos.x, e->pos.z, 0xFF4040F0u, 3.0f * ui);
     }
+    if (g->act == 1) {   /* M4: pursuing cruisers + heli on the minimap */
+        for (int i = g->city.chase0; i < g->city.veh_count; i++) {
+            const Vehicle *cv = &g->city.veh[i];
+            if (cv->state == VS_CHASE) MM_ICON(cv->pos.x, cv->pos.z, 0xC04040F0u, 3.0f * ui);
+        }
+        if (g->city.heli_active)
+            MM_ICON(g->player.pos.x + cosf(g->city.heli_ang) * 18.0f,
+                    g->player.pos.z + sinf(g->city.heli_ang) * 18.0f,
+                    0xC04040F0u, 4.0f * ui);
+    }
     #undef MM_ICON
 
     /* player: white dot + gold heading tick */
@@ -2115,8 +2334,10 @@ static void draw_hud(Game *g) {
     /* top-left: mode + course objective */
     font_text_shadow(pad, pad, fs, "DIVIDED HORIZON", C_GOLD);
     char buf[160];
-    snprintf(buf, sizeof(buf), "%s  -  M3 ISLAND  -  %s",
-             game_mode_name(g->mode), player_stance_name(p->stance));
+    snprintf(buf, sizeof(buf), "%s  -  %s  -  %s",
+             game_mode_name(g->mode),
+             g->act == 1 ? "M4 MERIDIAN CITY" : "M3 ISLA SOMBRA",
+             player_stance_name(p->stance));
     font_text_shadow(pad, pad + 12.0f * fs, fs * 0.85f, buf, C_DIM);
 
     /* outpost objective (only while the site is relevant, §33 tell the player) */
@@ -2252,6 +2473,57 @@ static void draw_hud(Game *g) {
         font_text_center(W * 0.5f, H - 146.0f * ui, fs * 0.8f, "RAISING THE FLAG", C_JADE);
     }
 
+    /* ── M4 city HUD: heat stars, cash, speedo, radio, job, escape clock ── */
+    if (g->act == 1 && g->mode == GM_PLAY) {
+        City *c = &g->city;
+        float stx = W - pad - 132.0f * ui, sty = pad + 142.0f * ui;
+        for (int i = 0; i < 5; i++) {
+            uint32_t scol = (i < c->heat.stars) ? 0xFF30C8F0u : 0xC0302820u;
+            rend_quad2d(stx + i * 15.0f * ui, sty, 12.0f * ui, 12.0f * ui,
+                        -1, 0,0,1,1, scol);
+        }
+        font_text_shadow(stx + 80.0f * ui, sty + 1.0f * ui, fs * 0.65f,
+                         heat_star_name(c->heat.stars),
+                         c->heat.stars >= 3 ? C_RED : C_DIM);
+        if (c->heat.searching && c->heat.stars > 0) {
+            bar(stx, sty + 16.0f * ui, 72.0f * ui, 5.0f * ui,
+                dh_clampf(c->heat.escape_t / HEAT_ESCAPE_S, 0.0f, 1.0f), C_TEAL, C_DARK);
+            font_text_shadow(stx, sty + 24.0f * ui, fs * 0.62f, "LOSING THEM...", C_TEAL);
+        }
+        snprintf(buf, sizeof(buf), "CASH $%d", g->cash);
+        font_text_shadow(pad + bw + 8.0f * ui, by - 14.0f * ui, fs * 0.9f, buf, C_GOLD);
+        if (g->in_vehicle >= 0) {
+            const Vehicle *v = &c->veh[g->in_vehicle];
+            const VehicleDef *vd = &c->defs[v->def];
+            snprintf(buf, sizeof(buf), "%s   %3.0f KM/H", vd->name,
+                     (double)(fabsf(v->speed) * 3.6));
+            font_text_center(W * 0.5f, H - 62.0f * ui, fs * 0.9f, buf, C_WHITE);
+            if (vd->radio) {
+                snprintf(buf, sizeof(buf), "[Q] RADIO: %s", city_radio_name(c->radio_station));
+                font_text_center(W * 0.5f, H - 48.0f * ui, fs * 0.7f, buf, C_DIM);
+            }
+            float dmg = dh_clampf(v->damage / vd->hp, 0.0f, 1.0f);
+            if (dmg > 0.25f)
+                bar(W * 0.5f - 90.0f * ui, H - 40.0f * ui, 180.0f * ui, 4.0f * ui,
+                    1.0f - dmg, dmg > 0.7f ? C_RED : C_GOLD, C_DARK);
+        } else if (v3_dist_xz(p->pos, c->hotdog_stand) < 6.0f) {
+            font_text_center(W * 0.5f, H - 120.0f * ui, fs * 0.85f,
+                             "[E] BUY HOT DOG - $5", C_JADE);
+        } else if (v3_dist_xz(p->pos, c->job_board) < 6.0f) {
+            font_text_center(W * 0.5f, H - 120.0f * ui, fs * 0.85f,
+                             "[E] ODD JOB BOARD", C_GOLD);
+        } else if (city_nearest_vehicle(c, p->pos, 3.5f, 0) >= 0) {
+            font_text_center(W * 0.5f, H - 120.0f * ui, fs * 0.85f,
+                             "[E] ENTER VEHICLE", C_WHITE);
+        }
+        if (c->job.active == 1 || c->job.active == 2) {
+            snprintf(buf, sizeof(buf), "HOT DELIVERY  %.0fs  $%d  %s",
+                     (double)c->job.timer, c->job.reward,
+                     c->job.active == 1 ? "- GET THE CRATE" : "- DELIVER TO THE STAND");
+            font_text_shadow(pad, pad + 26.0f * fs, fs * 0.9f, buf, C_GOLD);
+        }
+    }
+
     /* toast message */
     if (g->message_t > 0.0f && g->message[0]) {
         float a = dh_clampf(g->message_t, 0.0f, 1.0f);
@@ -2359,9 +2631,12 @@ void game_render(Game *g) {
     draw_sky(g);
     draw_terrain(g);
     draw_props(g);
+    if (g->act == 1) city_render(&g->city, g);
     draw_enemies(g);
-    draw_critters(g);
-    draw_outpost_flag(g);
+    if (g->act == 0) {
+        draw_critters(g);
+        draw_outpost_flag(g);
+    }
     draw_pickups(g);
     draw_tracers_fx(g);
     draw_zips(g);
