@@ -16,6 +16,8 @@ void player_init(Player *p, const Terrain *t, const ObstacleSet *obs, Vec3 spawn
     p->breath_max = PL_BREATH_BASE;
     p->breath = p->breath_max;
     p->health = 100.0f;
+    p->health_max = 100.0f;
+    p->stamina_mul = 1.0f;
     p->ground_normal = v3(0, 1, 0);
     p->stance = PL_ST_AIR;
     player_set_spawn(p, spawn);
@@ -36,7 +38,8 @@ void player_set_spawn(Player *p, Vec3 spawn) {
 }
 
 void player_respawn(Player *p, Vec3 spawn) {
-    p->health = 100.0f;
+    if (p->health_max < 1.0f) p->health_max = 100.0f;
+    p->health = p->health_max;
     p->breath = p->breath_max;
     p->stamina = PL_STAMINA_MAX;
     p->stance = PL_ST_GROUND;
@@ -267,7 +270,7 @@ void player_input(Player *p, const PlayerInput *in, float dt) {
             float surf = water - 0.45f;
             vy = dh_clampf((surf - p->pos.y) * 1.2f, -0.8f, 0.9f);
         }
-        if (in->sprint && p->stamina > 1.0f) { p->stamina -= PL_STAMINA_DRAIN * dt; }
+        if (in->sprint && p->stamina > 1.0f) { p->stamina -= PL_STAMINA_DRAIN * dt / (p->stamina_mul > 0.1f ? p->stamina_mul : 1.0f); }
         p->vel.y = dh_lerp(p->vel.y, vy, 1.0f - expf(-7.0f * dt));
 
         p->pos = v3_add(p->pos, v3_mul(p->vel, dt));
@@ -336,7 +339,7 @@ void player_input(Player *p, const PlayerInput *in, float dt) {
     if (wading) target *= 0.62f;
 
     if (want_sprint) {
-        p->stamina -= PL_STAMINA_DRAIN * dt;
+        p->stamina -= PL_STAMINA_DRAIN * dt / (p->stamina_mul > 0.1f ? p->stamina_mul : 1.0f);
         p->stamina_idle = 0.0f;
         if (p->stamina < 0.0f) p->stamina = 0.0f;
     } else {

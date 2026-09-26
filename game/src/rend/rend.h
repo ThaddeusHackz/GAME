@@ -80,6 +80,7 @@ int   mesh_register(Mesh *m);
 const Mesh *mesh_get(int id);
 int   mesh_count(void);
 void  mesh_release_all(void);
+void  mesh_unregister(int id);   /* M5: free one mesh, slot is reused */
 
 /* ── render items ──────────────────────────────────────────────────────── */
 typedef enum {

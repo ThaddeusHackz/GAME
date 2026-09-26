@@ -1,0 +1,15 @@
+# M5 systems demo: HUD, map screen (TAB), character screen (I) skills + crafting
+key 0.0 0 0 0x0 0 0
+shot 1.0 m5_hud
+key 1.1 0 0 0x800 0 0
+key 1.2 0 0 0x0 0 0
+shot 1.6 m5_map
+key 1.7 0 0 0x1000 0 0
+key 1.8 0 0 0x0 0 0
+key 1.9 0 0 0x8000000 0 0
+key 2.0 0 0 0x0 0 0
+shot 2.4 m5_skills
+key 2.5 0 0 0x10000 0 0
+key 2.6 0 0 0x0 0 0
+shot 3.0 m5_crafting
+end 3.2

@@ -103,6 +103,8 @@ typedef struct {
 
     /* combat-agnostic vitals for M1 (M2 extends) */
     float health;
+    float health_max;      /* M5: 100 base, TOUGH HIDE skill raises it */
+    float stamina_mul;     /* M5: SECOND WIND skill (drain divisor) */
 
     /* instrumentation — tests assert on these */
     struct {

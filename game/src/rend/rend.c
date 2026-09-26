@@ -220,15 +220,24 @@ void mesh_finalize(Mesh *m) {
 }
 int mesh_register(Mesh *m) {
     if (!m) return -1;
+    /* M5: reuse slots freed by mesh_unregister (world swaps on the ferry
+       used to leak ~70 terrain chunks per trip until the registry filled) */
+    for (int i = 0; i < g_mesh_count; i++)
+        if (!g_mesh[i]) { mesh_finalize(m); g_mesh[i] = m; return i; }
     if (g_mesh_count >= MAX_MESH) { DH_ERROR("rend","mesh registry full"); mesh_free(m); return -1; }
     mesh_finalize(m);
     g_mesh[g_mesh_count] = m;
     return g_mesh_count++;
 }
+void mesh_unregister(int id) {
+    if (id < 0 || id >= g_mesh_count || !g_mesh[id]) return;
+    mesh_free(g_mesh[id]);
+    g_mesh[id] = NULL;
+}
 const Mesh *mesh_get(int id) { return (id >= 0 && id < g_mesh_count) ? g_mesh[id] : NULL; }
 int mesh_count(void) { return g_mesh_count; }
 void mesh_release_all(void) {
-    for (int i = 0; i < g_mesh_count; i++) mesh_free(g_mesh[i]);
+    for (int i = 0; i < g_mesh_count; i++) if (g_mesh[i]) mesh_free(g_mesh[i]);
     g_mesh_count = 0;
 }
 

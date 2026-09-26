@@ -2,6 +2,7 @@
    DIVIDED HORIZON — game application layer (M1: Traversal)
    ══════════════════════════════════════════════════════════════════════════ */
 #include "game.h"
+#include "../core/save.h"
 #include "../core/dh_log.h"
 
 #include <stdarg.h>
@@ -760,6 +761,9 @@ static void build_minimap_cache(Game *g) {
 
 /* Orchestrator — called from game_init BEFORE terrain_build_chunks (the pads
    must exist in the heightfield before meshing). */
+static void sys_build_island_extras(Game *g);   /* M5, systems.inl */
+static void sys_build_city_extras(Game *g);
+static void sys_island_restore(Game *g);
 static void build_island(Game *g) {
     memset(g->fog, 0, sizeof g->fog);
     build_outpost(g);
@@ -768,6 +772,7 @@ static void build_island(Game *g) {
     spawn_wildlife(g);
     build_minimap_cache(g);
     outpost_spawn_garrison(g);
+    sys_build_island_extras(g);
 }
 
 /* Deploy to the outpost DoD start: beach south of Punta Quemada, full
@@ -793,7 +798,7 @@ void game_outpost_start(Game *g) {
     g->player.vel = v3(0.f, 0.f, 0.f);
     g->player.yaw = 3.1415927f;          /* face -z: the outpost gate */
     g->player.pitch = 0.f;
-    g->player.health = 100.f;
+    g->player.health = g->player.health_max;
     g->spawn = sp;
     game_start_play(g);
     game_message(g, "%s - 8 HOSTILES. B binoculars / T takedown / E interact. Stealth, guns, or both.",
@@ -866,7 +871,7 @@ void game_arena_start(Game *g, int n_enemies)
     g->player.vel = v3(0.f, 0.f, 0.f);
     g->player.yaw = 0.f;               /* +z: toward the arena centre */
     g->player.pitch = 0.f;
-    g->player.health = 100.f;
+    g->player.health = g->player.health_max;
     g->spawn = g->player.pos;          /* arena checkpoint */
     g->arena_active = 1;
     g->arena_total = n;
@@ -906,6 +911,7 @@ typedef struct {
     int   enemy_i;           /* -1 = world */
     int   zone;
     int   alarm_hit;         /* M3: hit the outpost alarm box */
+    int   critter_i;         /* M5: hunted animal (-1 none) */
 } HitScan;
 
 #define HITSCAN_RANGE 260.0f
@@ -915,6 +921,7 @@ static HitScan combat_hitscan(Game *g, Vec3 o, Vec3 d)
     HitScan hs;
     memset(&hs, 0, sizeof hs);
     hs.enemy_i = -1;
+    hs.critter_i = -1;
     hs.t = HITSCAN_RANGE;
     hs.normal = v3_neg(d);
 
@@ -967,6 +974,19 @@ static HitScan combat_hitscan(Game *g, Vec3 o, Vec3 d)
             hs.normal = v3_neg(d);
         }
     }
+    /* M5 hunting: living wildlife are shootable (§70 hides) */
+    if (g->act == 0) {
+        for (int i = 0; i < g->critter_count; i++) {
+            const Critter *c = &g->critters[i];
+            if (c->state >= 3) continue;
+            float tc;
+            if (ray_box_t(o, d, v3(c->pos.x - 0.5f, c->pos.y, c->pos.z - 0.5f),
+                          v3(c->pos.x + 0.5f, c->pos.y + 1.1f, c->pos.z + 0.5f), hs.t, &tc)) {
+                hs.hit = 1; hs.t = tc; hs.enemy_i = -1; hs.alarm_hit = 0; hs.critter_i = i;
+                hs.normal = v3_neg(d);
+            }
+        }
+    }
     hs.point = v3_add(o, v3_mul(d, hs.t));
     if (!v3_valid(hs.point)) { hs.hit = 0; hs.point = o; }   /* 18.4: no NaN */
     return hs;
@@ -998,10 +1018,22 @@ static void combat_start_reload(Game *g)
     }
     g->reloading = 1;
     g->reload_slot = sl;
-    g->reload_t = w->reload_s;
+    g->reload_t = w->reload_s * prog_mod(&g->prog, MOD_RELOAD);   /* QUICK HANDS */
 }
 
 static void outpost_raise_alarm(Game *g);   /* fwd: gunfire can trip the alarm */
+
+/* M5: award XP for a gameplay event; announce level-ups (§71). */
+static void sys_xp(Game *g, ProgEvent ev) {
+    int lv = g->prog.level;
+    prog_event(&g->prog, ev, 0);
+    if (g->prog.level > lv) {
+        game_message(g, "LEVEL %d - +%d SKILL POINT%s (I opens skills)", g->prog.level,
+                     g->prog.level - lv, g->prog.level - lv > 1 ? "S" : "");
+        g->message_t = 3.5f;
+        DH_INFO("game", "level up -> %d (points %d)", g->prog.level, g->prog.skill_points);
+    }
+}
 
 static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
 {
@@ -1021,11 +1053,14 @@ static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
     /* unsuppressed gunfire inside the outpost's earshot wakes the garrison
        (no suppressors until the combat-v2 backlog — honest and loud, §37) */
     if (g->outpost.built && !g->outpost.captured && !g->outpost.alarm_destroyed &&
-        v3_dist_xz(eye, g->outpost.center) < g->outpost.radius + 40.f)
+        v3_dist_xz(eye, g->outpost.center) <
+            (g->outpost.radius + 40.f) * prog_mod(&g->prog, MOD_ALARM_RADIUS))
         outpost_raise_alarm(g);
+    if (g->act == 0) prog_event(&g->prog, EV_LOUD_SHOT, 0);   /* island alert (§13.6) */
 
     /* recoil: part permanent climb (into yaw/pitch), part decaying punch */
-    Vec3 rec = weapon_recoil(w, g->ads_k, g->shot_index++);
+    Vec3 rec = v3_mul(weapon_recoil(w, g->ads_k, g->shot_index++),
+                      prog_mod(&g->prog, MOD_RECOIL));   /* STEADY HANDS */
     p->pitch += rec.y * 0.55f;
     p->yaw   += rec.x * 0.55f;
     if (p->pitch > 1.5f) p->pitch = 1.5f;
@@ -1046,6 +1081,7 @@ static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
         if (hs.enemy_i >= 0) {
             Enemy *e = &g->enemies.v[hs.enemy_i];
             float dmg = weapon_damage(w, hs.zone, hs.t);
+            if (hs.zone == ZONE_HEAD) dmg *= prog_mod(&g->prog, MOD_HEADSHOT);
             int killed = enemy_apply_damage(e, dmg, hs.zone);
             g->hitmark_t = 0.14f;
             g->hitmark_kill = killed;
@@ -1053,6 +1089,8 @@ static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
             if (killed) {
                 g->kills++;
                 e->dropped = 1;
+                sys_xp(g, EV_KILL);
+                if (hs.zone == ZONE_HEAD) sys_xp(g, EV_HEADSHOT);
                 /* loot roll: 30% health, 45% ammo for the gun in hand, else nothing */
                 float rr = rng_f(&g->rng);
                 if (rr < 0.30f)
@@ -1060,6 +1098,8 @@ static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
                 else if (rr < 0.75f)
                     pickup_add(g, v3_add(e->pos, v3(0.f, 0.4f, 0.f)), PK_AMMO, w->ammo,
                                (float)(w->mag * 2));
+                else
+                    pickup_add(g, v3_add(e->pos, v3(0.f, 0.4f, 0.f)), PK_SCRAP, 0, 1.f);
                 if (g->kills % 5 == 0) {
                     game_message(g, "%d HOSTILES DOWN", g->kills);
                     g->message_t = 1.5f;
@@ -1068,6 +1108,7 @@ static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
         } else if (hs.alarm_hit) {
             Outpost *o = &g->outpost;
             float dmg = weapon_damage(w, ZONE_TORSO, hs.t);
+            if (prog_has(&g->prog, SK_WIRE_CUTTER)) dmg *= 2.f;
             o->alarm_hp -= dmg;
             g->hitmark_t = 0.14f; g->hitmark_kill = 0;
             fx_spawn(g, hs.point, v3_mul(pd, -0.4f), 8, 0xFF40C8FFu, 2.5f, 0.25f, 1);
@@ -1077,6 +1118,13 @@ static void combat_fire(Game *g, Vec3 eye, Vec3 dir)
                 g->message_t = 3.f;
                 DH_INFO("game", "outpost alarm box destroyed");
             }
+        } else if (hs.critter_i >= 0) {
+            Critter *c = &g->critters[hs.critter_i];
+            c->state = 3; c->vel = v3(0, 0, 0); c->state_t = 0.f;
+            g->hitmark_t = 0.14f; g->hitmark_kill = 1;
+            fx_spawn(g, hs.point, v3_mul(pd, -0.4f), 6, 0xFF2828B0u, 2.5f, 0.25f, 2);
+            game_message(g, "%s DOWN - [E] to skin", c->species == 0 ? "VENADO" : "JABALI");
+            g->message_t = 2.f;
         } else if (hs.hit) {
             fx_spawn(g, hs.point, hs.normal, 7, 0xFF90B8D8u, 3.f, 0.3f, 0);
         }
@@ -1097,12 +1145,22 @@ static void combat_pickups_update(Game *g, float dt)
         if (player_is_down(p)) continue;
         if (v3_dist_xz(p->pos, k->pos) < 1.3f && fabsf(p->pos.y - k->pos.y) < 2.2f) {
             if (k->kind == PK_HEALTH) {
-                if (p->health >= 100.f) continue;          /* don't waste it */
-                p->health = dh_clampf(p->health + k->amount, 0.f, 100.f);
+                if (p->health >= p->health_max) continue;          /* don't waste it */
+                p->health = dh_clampf(p->health + k->amount, 0.f, p->health_max);
                 game_message(g, "MEDKIT +%.0f HP", (double)k->amount);
+            } else if (k->kind == PK_HERB) {
+                g->prog.mat[MAT_HERB]++;
+                game_message(g, "HERB +1 (%d) - craft medkits (I)", g->prog.mat[MAT_HERB]);
+            } else if (k->kind == PK_SCRAP) {
+                g->prog.mat[MAT_SCRAP]++;
+                game_message(g, "SCRAP +1 (%d)", g->prog.mat[MAT_SCRAP]);
             } else {
-                g->ammo[k->ammo] += (int)k->amount;
-                game_message(g, "%s AMMO +%d", ammo_name(k->ammo), (int)k->amount);
+                int cap = game_ammo_cap(g, k->ammo);
+                if (g->ammo[k->ammo] >= cap) continue;          /* full: leave it */
+                int add = (int)k->amount;
+                if (g->ammo[k->ammo] + add > cap) add = cap - g->ammo[k->ammo];
+                g->ammo[k->ammo] += add;
+                game_message(g, "%s AMMO +%d", ammo_name(k->ammo), add);
             }
             g->message_t = 1.4f;
             k->live = 0;
@@ -1117,6 +1175,7 @@ static void outpost_raise_alarm(Game *g) {
     if (!o->built || o->alarm || o->captured) return;
     o->alarm = 1;
     o->alarm_t = 0.f;
+    prog_event(&g->prog, EV_ALARM, 0);          /* M5: island alert jumps */
     game_message(g, "ALARM RAISED - %s is awake. Reinforcements inbound.", o->name);
     g->message_t = 3.5f;
     DH_INFO("game", "outpost alarm raised (alarm box %s)",
@@ -1154,7 +1213,7 @@ static void binoculars_update(Game *g, const PlatInput *in, float dt) {
             Vec3 chest = v3_add(e->pos, v3(0.f, 1.2f, 0.f));
             Vec3 to = v3_sub(chest, eye);
             float dist = v3_len(to);
-            if (dist > 220.f || dist < 0.5f) continue;
+            if (dist > 220.f * prog_mod(&g->prog, MOD_TAG_TIME) || dist < 0.5f) continue;
             /* perpendicular miss distance vs a 0.9 m + 2% slack cone */
             Vec3 cr = v3_cross(to, dir);
             float miss = v3_len(cr);
@@ -1200,13 +1259,15 @@ static void melee_update(Game *g, const PlatInput *in, float dt) {
         g->hitmark_t = 0.14f; g->hitmark_kill = 1;
         fx_spawn(g, v3_add(e->pos, v3(0.f, 1.2f, 0.f)), v3(0.f, 1.f, 0.f),
                  8, 0xFF2828B0u, 2.f, 0.25f, 2);
+        sys_xp(g, EV_TAKEDOWN);
+        if (prog_has(&g->prog, SK_CHAIN_TAKEDOWN)) g->melee_cd = 0.f;
         game_message(g, "SILENT TAKEDOWN - no one heard a thing");
         g->message_t = 1.6f;
         DH_INFO("game", "silent takedown at (%.0f,%.0f)", e->pos.x, e->pos.z);
     } else {
         int killed = enemy_apply_damage(e, 40.f, ZONE_TORSO);
         g->hitmark_t = 0.14f; g->hitmark_kill = killed;
-        if (killed) g->kills++;
+        if (killed) { g->kills++; sys_xp(g, EV_KILL); }
         fx_spawn(g, v3_add(e->pos, v3(0.f, 1.2f, 0.f)), v3(0.f, 1.f, 0.f),
                  6, 0xFF2828B0u, 2.f, 0.25f, 2);
         game_message(g, killed ? "MELEE KILL" : "MELEE SWING");
@@ -1221,6 +1282,7 @@ static void critters_update(Game *g, float dt) {
     const Player *p = &g->player;
     for (int i = 0; i < g->critter_count; i++) {
         Critter *c = &g->critters[i];
+        if (c->state >= 3) continue;              /* M5: carcass / skinned */
         float dp = v3_dist_xz(p->pos, c->pos);
         if (dp > 165.f) continue;                 /* simulate near the player */
         float speed_walk = (c->species == 0) ? 1.4f : 1.0f;
@@ -1300,8 +1362,9 @@ static void island_update(Game *g, const PlatInput *in, float dt) {
         if (o->waves_spawned < 2 && !o->alarm_destroyed &&
             o->alarm_t > (o->waves_spawned == 0 ? 9.f : 24.f)) {
             Vec3 sp = o->reinforce[o->waves_spawned];
-            for (int i = 0; i < 3; i++) {
-                Vec3 pos = v3(sp.x + (float)(i - 1) * 2.5f, sp.y, sp.z);
+            int wn = prog_reinforce_size(&g->prog);   /* M5: 3 + island alert level */
+            for (int i = 0; i < wn; i++) {
+                Vec3 pos = v3(sp.x + (float)(i - 1) * 2.5f, sp.y, sp.z + (float)(i / 3) * 2.5f);
                 enemies_spawn(&g->enemies, pos,
                               i == 2 ? EN_BRUISER : EN_GRUNT, 2,
                               pos, o->center);
@@ -1320,6 +1383,9 @@ static void island_update(Game *g, const PlatInput *in, float dt) {
             if (o->capture_t >= 3.f) {
                 o->captured = 1;
                 o->capture_t = 3.f;
+                sys_xp(g, o->alarm ? EV_OUTPOST_LOUD : EV_OUTPOST_STEALTH);
+                g->prog.ft_unlocked[FT_OUTPOST] = 1;
+                g->prog.ft[FT_OUTPOST].pos = o->flag_pos;
                 game_message(g, "%s LIBERATED - Isla Sombra 1/1. Supplies dropped.", o->name);
                 g->message_t = 6.f;
                 pickup_add(g, v3(o->flag_pos.x - 2.f, o->pad_h + 0.4f, o->flag_pos.z),
@@ -1344,6 +1410,8 @@ static void island_update(Game *g, const PlatInput *in, float dt) {
         if (v3_dist(p->pos, top) < 3.2f) {
             o->mast_synced = 1;
             fog_sync_all(g);
+            sys_xp(g, EV_MAST);
+            g->prog.ft_unlocked[FT_MAST] = 1;
             game_message(g, "SIGNAL MAST SYNCED - Isla Sombra mapped");
             g->message_t = 5.f;
             DH_INFO("game", "signal mast synced");
@@ -1419,6 +1487,7 @@ static void combat_update(Game *g, const PlatInput *in, float dt)
     pv.moving = v3_len(v3(p->vel.x, 0.f, p->vel.z)) > 3.0f;
     pv.alive = !player_is_down(p);
     pv.light = dh_clampf(g->light.sun_intensity, 0.15f, 1.0f);  /* M3: night hides you (§82) */
+    pv.light *= prog_mod(&g->prog, MOD_NOISE);                 /* M5: SOFT STEP */
     pv.noise = g->noise_t > 0.f ? 1.0f : 0.0f;
     int hp_before = (int)p->health;
     enemies_update(&g->enemies, &pv, dt, &g->terrain, &g->obs);
@@ -1435,8 +1504,19 @@ static void combat_update(Game *g, const PlatInput *in, float dt)
         fx_spawn(g, muz, v3_mul(v3_sub(pv.eye, muz), 0.05f), 3, 0xFF40A0FFu, 2.f, 0.06f, 0);
         if (rng_f(&g->rng) < e->shot_acc) {
             float dmg = enemy_shot_damage(e->arch);
-            p->health = dh_clampf(p->health - dmg, 0.f, 100.f);
+            if (g->armor > 0.f) {                    /* M5 plate absorbs 60% */
+                float ab = dh_minf(g->armor, dmg * 0.6f);
+                g->armor -= ab; dmg -= ab;
+            }
+            p->health = dh_clampf(p->health - dmg, 0.f, p->health_max);
             g->damage_flash = 0.5f;
+            if (p->health <= 0.f && prog_has(&g->prog, SK_LAST_STAND) &&
+                g->prog.last_stand_cd <= 0.f) {
+                p->health = 1.f;                     /* M5: LAST STAND */
+                g->prog.last_stand_cd = 120.f;
+                game_message(g, "LAST STAND - GET TO COVER");
+                g->message_t = 2.5f;
+            }
         }
     }
     if ((int)p->health < hp_before && p->health <= 0.f) {
@@ -1511,7 +1591,11 @@ static void draw_pickups(Game *g)
         if (!k->live || !rend_should_draw(&k->pos, 1.f)) continue;
         float y = k->pos.y + 0.55f + sinf(k->bob) * 0.09f;
         Mat4 m = m4_mul(m4_translate(v3(k->pos.x, y, k->pos.z)), m4_scale1(0.44f));
-        uint32_t c = (k->kind == PK_HEALTH) ? 0xFF50C860u : 0xFF30A8F0u;
+        uint32_t c = (k->kind == PK_HEALTH) ? 0xFF50C860u :
+                     (k->kind == PK_HERB)   ? 0xFF3CD27Au :     /* M5 leafy green */
+                     (k->kind == PK_SCRAP)  ? 0xFF8C9296u : 0xFF30A8F0u;
+        if (k->kind == PK_HERB) m = m4_mul(m4_translate(v3(k->pos.x, k->pos.y + 0.25f, k->pos.z)),
+                                           m4_scale(v3(0.35f, 0.5f, 0.35f)));
         rend_mesh_lit(g->mesh_box, &m, -1, c, 1.f, 1, 1, 1, 0, 1);
     }
 }
@@ -1534,7 +1618,15 @@ static void draw_tracers_fx(Game *g)
 static void draw_critters(Game *g) {
     for (int i = 0; i < g->critter_count; i++) {
         const Critter *c = &g->critters[i];
+        if (c->state == 4) continue;                 /* skinned */
         if (!rend_should_draw(&c->pos, 2.0f)) continue;
+        if (c->state == 3) {                         /* carcass lies on its side */
+            uint32_t bc = (c->species == 0) ? 0xFF56708Eu : 0xFF30384Au;
+            Mat4 mc = m4_mul(m4_translate(v3(c->pos.x, c->pos.y + 0.22f, c->pos.z)),
+                             m4_mul(m4_rot_y(c->yaw), m4_scale(v3(0.8f, 0.4f, 0.9f))));
+            rend_mesh_lit(g->mesh_box, &mc, -1, bc, 1.f, 1, 1, 1, 0, 1);
+            continue;
+        }
         float bob = sinf(c->hop) * 0.04f;
         uint32_t body = (c->species == 0) ? 0xFF6E8CB2u : 0xFF3C465Au;  /* venado / jabalí */
         float bl = (c->species == 0) ? 0.85f : 0.75f;
@@ -1789,6 +1881,7 @@ static void city_build_props(Game *g) {
 void game_load_city(Game *g) {
     if (!g || !g->ready) return;
     DH_INFO("game", "loading act II: Meridian City (world swap, Spec 4.3)");
+    game_island_store(g);        /* M5: the island remembers what you did */
     g->act = 1;
     g->in_vehicle = -1;
     /* clear act-I dynamic content */
@@ -1815,12 +1908,13 @@ void game_load_city(Game *g) {
     terrain_build_chunks(&g->terrain, CHUNK_M);
     city_init(&g->city, g);
     city_build_props(g);
+    sys_build_city_extras(g);
     city_paint_map(g);
     memset(g->fog, 0, sizeof g->fog);
     g->spawn = g->city.player_spawn;
     player_respawn(&g->player, g->spawn);
     g->player.yaw = 3.14159265f;   /* face the skyline, harbor at your back */
-    g->player.health = 100.f;
+    g->player.health = g->player.health_max;
     g->respawn_t = 0.f;
     g->damage_flash = 0.f;
     game_set_time(g, g->day_t);
@@ -1852,13 +1946,16 @@ void game_load_island(Game *g) {
     build_combat_arena(g);
     memset(&g->outpost, 0, sizeof g->outpost);
     build_island(g);
+    sys_island_restore(g);       /* M5: captured stays captured, fog stays lifted */
     terrain_build_chunks(&g->terrain, CHUNK_M);
     g->spawn = v3(150.0f, 0.0f, 620.0f);          /* Beto drops you on the west beach */
     g->spawn.y = terrain_height(&g->terrain, g->spawn.x, g->spawn.z) + 0.1f;
     player_respawn(&g->player, g->spawn);
     g->player.zips = &g->zips;
     g->player.yaw = 1.5708f;
-    g->player.health = 100.f;
+    g->player.health = g->player.health_max;
+    game_apply_skills(g);
+    g->player.health = g->player.health_max;
     game_message(g, "ISLA SOMBRA - BETO'S FERRY DROPS YOU ON THE WEST BEACH");
     g->message_t = 4.0f;
 }
@@ -1924,6 +2021,9 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
 
     /* ── island vertical slice (M3): outpost, mast, jungle, wildlife, fog ── */
     g->day_t = 0.08f;                 /* ~07:55 — Act I jade-and-gold morning */
+    prog_init(&g->prog);              /* M5: xp / skills / economy */
+    economy_load(&g->econ);
+    save_init();
     build_island(g);
 
     int chunks = terrain_build_chunks(&g->terrain, CHUNK_M);
@@ -1937,6 +2037,7 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     g->player.pitch = -0.05f;
 
     game_apply_settings(g);
+    game_apply_skills(g);
     g->ready = 1;
     DH_INFO("game", "M1 world ready: %d chunks, %d obstacles, %d textures, backend %s",
             chunks, g->obs.count, tex_count(), rend_backend_name());
@@ -1966,6 +2067,8 @@ void game_free(Game *g) {
 
 /* ══════════════════════════════ simulation ══════════════════════════════ */
 
+#include "systems.inl"   /* M5 systems & progression glue */
+
 void game_frame(Game *g, const PlatInput *in, float dt) {
     if (!g || !g->ready || !in) return;
     g->time += dt;
@@ -1977,6 +2080,10 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
     if (in->quit) { g->quit = 1; return; }
 
     if (g->mode == GM_MENU) {
+        if ((in->pressed & BTN_LOAD) && save_slot_exists(save_slot_index(0, 1))) {
+            if (game_load(g, 0, 1)) return;
+            game_message(g, "SAVE COULD NOT BE READ - starting fresh"); g->message_t = 3.f;
+        }
         if ((in->pressed & (BTN_JUMP | BTN_USE | BTN_MENU)) ||
             (in->buttons & BTN_JUMP)) {
             game_start_play(g);
@@ -1993,6 +2100,12 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
     }
 
     if (in->pressed & BTN_PAUSE) { g->mode = GM_PAUSE; return; }
+
+    /* ── M5 modal screens pause the simulation (map / character / shop) ── */
+    if (g->ui != UI_NONE) { sys_ui_input(g, in); return; }
+    if (in->pressed & BTN_MAP)  { g->ui = UI_MAP;  g->ui_sel = 0; return; }
+    if (in->pressed & BTN_CHAR) { g->ui = UI_CHAR; g->ui_sel = 0; g->ui_tab = 0; return; }
+    if (in->pressed & BTN_DEBUG) g->show_debug = !g->show_debug;
 
     /* ── combat sim runs first: ADS/recoil state then feeds movement ── */
     combat_update(g, in, dt);
@@ -2093,6 +2206,9 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
         g->respawn_t = 0.0f;
     }
 
+    /* ── M5: systems tick (heal, safehouse/vendor/skin interact, alert) ── */
+    sys_frame(g, in, dt);
+
     /* ── M4: Meridian City lives when act II is loaded ── */
     if (g->act == 1) city_frame(&g->city, g, in, dt);
 
@@ -2101,7 +2217,6 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
         g->mode = (g->mode == GM_PHOTO) ? GM_PLAY : GM_PHOTO;
         game_message(g, g->mode == GM_PHOTO ? "PHOTO MODE (HUD off)" : "PHOTO MODE off");
     }
-    if (in->pressed & BTN_MAP) { g->show_debug = !g->show_debug; }
 
     /* M2 dev/DoD hotkey: deploy to the combat arena (30 hostiles) */
     if (in->pressed & BTN_ARENA && g->act == 0) {
@@ -2310,6 +2425,8 @@ static void draw_minimap(Game *g) {
     font_text_shadow(mx + mm - 42.0f*ui, my + mm - 13.0f*ui, fs*0.85f, buf, C_WHITE);
 }
 
+#include "systems_ui.inl"   /* M5 screens + HUD extras */
+
 static void draw_hud(Game *g) {
     Settings *s = settings();
     float ui = s->ui_scale;
@@ -2365,7 +2482,7 @@ static void draw_hud(Game *g) {
     /* bottom-left: vitals */
     float by = H - pad - 46.0f * ui;
     float bw = 180.0f * ui, bh = 9.0f * ui;
-    bar(pad, by, bw, bh, p->health / 100.0f, p->health > 35.0f ? C_JADE : C_RED, C_DARK);
+    bar(pad, by, bw, bh, p->health / p->health_max, p->health > 35.0f ? C_JADE : C_RED, C_DARK);
     font_text_shadow(pad, by - 11.0f * ui, fs * 0.8f, "HEALTH", C_DIM);
     float sy2 = by + bh + 12.0f * ui;
     font_text_shadow(pad, sy2 - 10.0f * ui, fs * 0.8f, "STAMINA", C_DIM);
@@ -2557,7 +2674,7 @@ static void draw_hud(Game *g) {
     /* controls hint (bottom centre) — Spec 33: always tell the player */
     if (g->mode == GM_PLAY && g->time < 30.0f) {
         font_text_center(W * 0.5f, H - 26.0f * ui, fs * 0.8f,
-                         "WASD move  SHIFT sprint  SPACE jump  CTRL crouch  V roll  F/LMB fire  RMB/C aim  R reload  1/2/3 weapon  T takedown  B binoculars  E interact  G arena",
+                         "WASD move  SHIFT sprint  SPACE jump  CTRL crouch  V roll  LMB fire  RMB aim  R reload  1/2/3 weapon  T takedown  B binoculars  E interact  H heal  TAB map  I skills  K ferry",
                          0xC8FFFFFFu);
     }
     /* debug: add the world clock line */
@@ -2571,6 +2688,7 @@ static void draw_hud(Game *g) {
                  g->tagged_count);
         font_text_shadow(W - pad - 210.0f * ui, H - pad - 85.0f * ui, fs * 0.8f, buf, C_DIM);
     }
+    sys_draw_hud(g);
 }
 
 static void draw_menu(Game *g) {
@@ -2585,9 +2703,10 @@ static void draw_menu(Game *g) {
     font_text_center(W * 0.5f, H * 0.20f + ts * 10.0f, 2.0f * ui,
                      "AN ORIGINAL OPEN-WORLD ACTION GAME", C_DIM);
     font_text_center(W * 0.5f, H * 0.52f, 2.2f * ui,
+                     save_slot_exists(save_slot_index(0, 1)) ? "SPACE NEW GAME   -   L CONTINUE" :
                      "PRESS SPACE OR ENTER TO PLAY", C_WHITE);
     font_text_center(W * 0.5f, H * 0.60f, 1.8f * ui,
-                     "M1 MILESTONE - ISLA SOMBRA TRAVERSAL COURSE", C_TEAL);
+                     "M5 BUILD - ISLA SOMBRA + MERIDIAN CITY, SKILLS, SHOPS, SAVES", C_TEAL);
     font_text_center(W * 0.5f, H * 0.86f, 1.6f * ui,
                      "BUILT BY AI UNDER HUMAN DIRECTION - DRM FREE, OFFLINE COMPLETE",
                      0xC8B0A898u);
@@ -2647,6 +2766,7 @@ void game_render(Game *g) {
         if (g->mode == GM_MENU) draw_menu(g);
         else {
             draw_hud(g);
+            if (g->ui != UI_NONE) sys_draw_screen(g);
             const Player *pp = &g->player;
             if (pp->stance != PL_ST_ZIP && pp->zips) {
                 int zi; float zs, zd;

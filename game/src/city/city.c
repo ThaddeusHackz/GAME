@@ -249,7 +249,7 @@ static void vehicle_explode(City *c, struct Game *g, Vehicle *v) {
         g->player.pos = v3(v->pos.x - right.x * 2.4f, v->pos.y + 1.8f,
                            v->pos.z - right.z * 2.4f);
         g->player.vel = v3(0, 0, 0);
-        g->player.health = dh_clampf(g->player.health - 35.0f, 0.0f, 100.0f);
+        g->player.health = dh_clampf(g->player.health - 35.0f, 0.0f, g->player.health_max);
         g->damage_flash = 1.0f;
         game_message(g, "YOUR RIDE IS A WRECK - you bailed out for 35 damage");
         g->message_t = 3.0f;
@@ -272,7 +272,8 @@ static void vehicle_clamp(City *c, struct Game *g, Vehicle *v) {
     v->pos.z = dh_clampf(v->pos.z, CITY_BOUNDS_MIN - 14.0f, 652.0f);
     v->pos.y = dh_maxf(th, 0.5f);
     if (pushed && v->state != VS_WRECK) {
-        vehicle_impact(v, fabsf(v->speed));
+        int mine = (g->in_vehicle >= 0 && v == &c->veh[g->in_vehicle]);
+        vehicle_impact(v, fabsf(v->speed) * (mine ? prog_mod(&g->prog, MOD_VEH_DAMAGE) : 1.0f));
         if (fabsf(v->speed) > 5.0f)
             game_fx(g, v->pos, v3(0, 1, 0), 5, 0xFFB0B0B0u, 2.5f, 0.35f, 0);
         if (vehicle_wrecked(v, c->defs)) vehicle_explode(c, g, v);
@@ -312,7 +313,7 @@ int city_enter_vehicle(City *c, struct Game *g, int vi) {
             float l = sqrtf(dx*dx + dz*dz) + 0.001f;
             p->panic_x = dx / l; p->panic_z = dz / l;
         }
-        int wallet = 25 + (int)(rng_f(&g->rng) * 36.0f);
+        int wallet = (25 + (int)(rng_f(&g->rng) * 36.0f)) * (int)prog_mod(&g->prog, MOD_WALLET);
         g->cash += wallet;
         c->wallets_looted++;
         char what[64];
@@ -365,7 +366,7 @@ int city_buy_hotdog(City *c, struct Game *g) {
     g->cash -= 5;
     c->hotdogs_bought++;
     float before = g->player.health;
-    g->player.health = dh_clampf(g->player.health + 15.0f, 0.0f, 100.0f);
+    g->player.health = dh_clampf(g->player.health + 15.0f * prog_mod(&g->prog, MOD_FOOD), 0.0f, g->player.health_max);
     game_message(g, "HOT DOG - $5. MUSTARD IS FREE. (+%.0f HP)",
                  g->player.health - before);
     g->message_t = 3.0f;
@@ -395,11 +396,14 @@ int city_job_interact(City *c, struct Game *g) {
     }
     if (j->active == 2 && dist2d(pp, j->dropoff) < 3.0f) {
         j->active = 3;
-        g->cash += j->reward;
+        int pay = (int)((float)j->reward * prog_mod(&g->prog, MOD_JOB_PAY) + 0.5f);
+        g->cash += pay;
+        g->prog.money_earned += pay;
+        prog_event(&g->prog, EV_JOB, 0);
         c->jobs_done++;
-        game_message(g, "DELIVERED - +$%d (cash $%d)", j->reward, g->cash);
+        game_message(g, "DELIVERED - +$%d (cash $%d)", pay, g->cash);
         g->message_t = 4.0f;
-        DH_INFO("city", "odd job #%d delivered (+$%d)", c->jobs_done, j->reward);
+        DH_INFO("city", "odd job #%d delivered (+$%d)", c->jobs_done, pay);
         return 3;
     }
     return 0;
@@ -546,7 +550,7 @@ static void chase_update(City *c, struct Game *g, float dt) {
 
         /* ram the player on foot */
         if (g->in_vehicle < 0 && dist < 2.4f && fabsf(v->speed) > 6.0f) {
-            g->player.health = dh_clampf(g->player.health - 25.0f, 0.0f, 100.0f);
+            g->player.health = dh_clampf(g->player.health - 25.0f, 0.0f, g->player.health_max);
             g->damage_flash = 1.0f;
             g->player.pos.x += dx / dist * 2.5f;
             g->player.pos.z += dz / dist * 2.5f;
@@ -555,7 +559,7 @@ static void chase_update(City *c, struct Game *g, float dt) {
         }
         /* pit the player's car */
         if (g->in_vehicle >= 0 && dist < 3.6f && fabsf(v->speed) > 4.0f) {
-            vehicle_impact(&c->veh[g->in_vehicle], fabsf(v->speed) * 0.6f);
+            vehicle_impact(&c->veh[g->in_vehicle], fabsf(v->speed) * 0.6f * prog_mod(&g->prog, MOD_VEH_DAMAGE));
             vehicle_impact(v, fabsf(v->speed) * 0.4f);
             if (vehicle_wrecked(&c->veh[g->in_vehicle], c->defs))
                 vehicle_explode(c, g, &c->veh[g->in_vehicle]);
@@ -576,7 +580,7 @@ static void chase_update(City *c, struct Game *g, float dt) {
                         if (vehicle_wrecked(pv, c->defs)) vehicle_explode(c, g, pv);
                     } else {
                         g->player.health = dh_clampf(g->player.health -
-                                                     (5.0f + (float)c->heat.stars), 0.0f, 100.0f);
+                                                     (5.0f + (float)c->heat.stars), 0.0f, g->player.health_max);
                         g->damage_flash = 0.8f;
                     }
                 }
@@ -614,7 +618,7 @@ static void heli_update(City *c, struct Game *g, float dt) {
                 pv->damage += 12.0f;
                 if (vehicle_wrecked(pv, c->defs)) vehicle_explode(c, g, pv);
             } else {
-                g->player.health = dh_clampf(g->player.health - 7.0f, 0.0f, 100.0f);
+                g->player.health = dh_clampf(g->player.health - 7.0f, 0.0f, g->player.health_max);
                 g->damage_flash = 0.8f;
             }
         }
@@ -688,7 +692,12 @@ void city_frame(City *c, struct Game *g, const PlatInput *in, float dt) {
             float thr = in->my > 0.0f ? dh_clampf(in->my, 0.0f, 1.0f) : 0.0f;
             float brk = in->my < 0.0f ? dh_clampf(-in->my, 0.0f, 1.0f) : 0.0f;
             int hb = (in->buttons & BTN_JUMP) ? 1 : 0;
-            vehicle_step(v, c->defs, dt, thr, brk, dh_clampf(in->mx, -1.0f, 1.0f), hb);
+            {   /* M5 WHEELMAN: player's car gets +15% top speed */
+                float keep = c->defs[v->def].top_ms;
+                c->defs[v->def].top_ms = keep * prog_mod(&g->prog, MOD_TOP_SPEED);
+                vehicle_step(v, c->defs, dt, thr, brk, dh_clampf(in->mx, -1.0f, 1.0f), hb);
+                c->defs[v->def].top_ms = keep;
+            }
             vehicle_clamp(c, g, v);
             g->player.pos = v3(v->pos.x, v->pos.y + d->height * 0.5f + 0.75f, v->pos.z);
             g->player.vel = v3(0, 0, 0);
@@ -711,7 +720,7 @@ void city_frame(City *c, struct Game *g, const PlatInput *in, float dt) {
                 if (dist2d(o->pos, v->pos) < 3.2f) {
                     float imp = fabsf(v->speed - o->speed) + 2.0f;
                     vehicle_impact(o, imp);
-                    vehicle_impact(v, imp * 0.5f);
+                    vehicle_impact(v, imp * 0.5f * prog_mod(&g->prog, MOD_VEH_DAMAGE));
                     if (vehicle_wrecked(o, c->defs)) vehicle_explode(c, g, o);
                     if (vehicle_wrecked(v, c->defs)) vehicle_explode(c, g, v);
                 }
@@ -754,7 +763,7 @@ void city_frame(City *c, struct Game *g, const PlatInput *in, float dt) {
     {
         float d; int los;
         heat_sensor(c, g, &d, &los);
-        heat_tick(&c->heat, dt, d, los);
+        heat_tick(&c->heat, dt / prog_mod(&g->prog, MOD_HEAT_ESCAPE), d, los);   /* LOW PROFILE */
         if (c->heat.stars > c->escape_peak_stars) c->escape_peak_stars = c->heat.stars;
         if (c->heat.just_dropped) {
             if (c->heat.stars == 0) {

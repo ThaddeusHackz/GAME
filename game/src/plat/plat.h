@@ -40,6 +40,10 @@
 #define BTN_BINOC   (1u << 22)   /* M3: binoculars (hold) — scout + tag (§44) */
 #define BTN_RADIO   (1u << 23)   /* M4: cycle radio station while driving */
 #define BTN_FERRY   (1u << 24)   /* M4: Beto's ferry - travel island <-> city */
+#define BTN_HEAL    (1u << 25)   /* M5: use a medkit / bandage */
+#define BTN_DEBUG   (1u << 26)   /* M5: perf overlay (was TAB; TAB is the map now) */
+#define BTN_CHAR    (1u << 27)   /* M5: character screen (skills / crafting / bag) */
+#define BTN_LOAD    (1u << 28)   /* M5: continue from the latest save (title screen) */
 
 typedef struct {
     uint32_t buttons;        /* held this frame */

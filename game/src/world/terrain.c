@@ -238,7 +238,9 @@ int terrain_build_chunks(Terrain *t, float chunk_m) {
 void terrain_release_chunks(Terrain *t) {
     /* Meshes live in the global registry; M1 rebuilds the world wholesale on
        map change, so releasing means dropping our ids (registry owns memory
-       until mesh_release_all at shutdown — pooled, no per-frame churn 11.3). */
+       until mesh_release_all at shutdown — pooled, no per-frame churn 11.3).
+       M5: world swaps now hand the chunk meshes back so slots are reused. */
+    for (int i = 0; i < t->chunk_count; i++) mesh_unregister(t->chunk_ids[i]);
     t->chunk_count = 0;
 }
 

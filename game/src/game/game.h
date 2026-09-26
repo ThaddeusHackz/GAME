@@ -20,10 +20,12 @@
 #include "../combat/weapon.h"
 #include "../ai/enemy.h"
 #include "../city/city.h"
+#include "../meta/progress.h"
 
 #define GAME_MAX_PROPS 640
 
 typedef enum { GM_MENU = 0, GM_PLAY, GM_PAUSE, GM_PHOTO } GameMode;
+typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP } GameUi;
 
 typedef struct {
     Mat4     model;
@@ -90,8 +92,8 @@ typedef struct {
 
 
 /* ── combat pickups + transient FX (M2) ── */
-#define PICKUP_MAX 48
-typedef enum { PK_NONE = 0, PK_HEALTH, PK_AMMO } PickupKind;
+#define PICKUP_MAX 64
+typedef enum { PK_NONE = 0, PK_HEALTH, PK_AMMO, PK_HERB, PK_SCRAP } PickupKind;
 typedef struct {
     Vec3  pos;
     int   kind;              /* PickupKind */
@@ -197,6 +199,14 @@ typedef struct Game {
     City         city;
     int          in_vehicle;     /* index into city.veh, -1 on foot */
     int          cash;           /* $ — jobs, looted wallets; hot dogs cost 5 */
+    /* ── systems & progression (M5, §70–§72) ── */
+    Progress     prog;           /* xp, skills, materials, alert, fast travel */
+    Economy      econ;           /* vendors + recipes (data/economy.json) */
+    int          ui;             /* GameUi — modal screens pause the sim */
+    int          ui_sel, ui_tab, ui_vendor;
+    float        armor;          /* 0..100 plate pool, absorbs 60% of damage */
+    Vec3         safehouse[2];   /* act 0 / act 1 safehouse doors */
+    int          saves_written;
 
     /* ── perf / config ── */
     float        fps_smooth;
@@ -223,6 +233,18 @@ void  game_outpost_start(Game *g);
 void  day_palette(float day_t, SceneLight *L);
 void  game_set_time(Game *g, float day_t);
 void  game_frame(Game *g, const PlatInput *in, float dt);   /* simulate only */
+/* ── M5 systems API (also driven by tests/smoke_systems.c) ── */
+void  game_apply_skills(Game *g);                /* push skill mods into player */
+int   game_ammo_cap(const Game *g, int ammo);    /* reserve cap incl. pack mule/pouch */
+int   game_shop_buy(Game *g, int vendor, int offer);   /* 0 ok, <0 error */
+int   game_fast_travel(Game *g, int node);       /* 0 ok, <0 error (see progress.h) */
+int   game_use_heal(Game *g);                    /* 1 if a medkit/bandage was used */
+int   game_skin_nearest(Game *g);                /* hides gained (0 = nothing in reach) */
+int   game_safehouse_rest(Game *g);              /* 1 = healed + saved */
+int   game_save(Game *g, int slot, int is_auto); /* 1 ok */
+int   game_load(Game *g, int slot, int is_auto); /* 1 ok */
+void  game_island_store(Game *g);                /* snapshot island before the ferry */
+int   game_map_reveal_pct(const Game *g);
 void  game_render(Game *g);                                 /* submit + draw */
 void  game_message(Game *g, const char *fmt, ...);
 /* M4: act-II world swap (Spec 4.3 — one streaming world per act). Frees the

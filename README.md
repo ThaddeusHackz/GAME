@@ -20,6 +20,7 @@ dependencies).
 | **M2 — Combat** | ✅ data-driven weapons, enemy FSM + detection, 30-enemy arena, 112-check combat smoke |
 | **M3 — Island Slice** | ✅ outpost capture (stealth/loud/mixed), signal mast, wildlife, day/night, fog-of-war minimap, binoculars, 82-check island smoke |
 | **M4 — City Slice** | ✅ Meridian City: 8 blocks + harbor, 5 data-driven vehicles, 15 traffic cars, 30 peds, heat 0-5 with cruisers + heli, odd job, hot-dog economy, ferry between acts, 154-check city smoke |
+| **M5 — Systems & Progression** | ✅ XP/levels (100+50(n-1)), 24 skills in 4 trees wired to live systems, 2 data-driven vendors (economy.json), hunting/skinning, herbs, 4 crafting recipes, medkits/armor, island alert level, safehouses (rest+autosave), map screen + fast travel, saves/continue incl. wanted stars, island state persists across the ferry, 93-check systems smoke |
 | M5–M13 | not started |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
@@ -89,6 +90,12 @@ See `MASTER_PROMPT.md` for the full design doctrine (Parts I–X).
 | T / B | takedown / binoculars (hold) | — |
 | Q | — | cycle radio (station names; audio arrives in M7) |
 | K | Beto's ferry: Isla Sombra <-> Meridian City (not while wanted) | |
+| TAB | Map screen + fast travel (UP/DOWN, E) | |
+| I | Character: skills / crafting / bag (LEFT/RIGHT, UP/DOWN, E) | |
+| H | Use medkit / bandage / armor plate | |
+| E | Also: trade at vendors, rest+save at safehouses, skin kills | |
+| L | Title screen: continue from the latest autosave | |
+| F3 | Perf/debug overlay (was TAB) | |
 | G | combat arena (island, dev) | |
 | P / Tab / Esc | photo mode / debug overlay / pause | |
 

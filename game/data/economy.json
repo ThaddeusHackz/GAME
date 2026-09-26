@@ -1,0 +1,34 @@
+{
+  "_comment": "DIVIDED HORIZON economy (Spec 72). One currency ($) across both acts. Positions are XZ metres; y is resolved from terrain at runtime. Prices are before the Smooth Talker discount.",
+  "vendors": [
+    { "id": "rosa", "name": "ROSA'S TRADING POST", "act": 0, "x": 158, "z": 612,
+      "offers": [
+        { "name": "Medkit",            "kind": "item",  "value": "medkit",  "amount": 1,  "price": 60 },
+        { "name": "Bandage",           "kind": "item",  "value": "bandage", "amount": 1,  "price": 20 },
+        { "name": "9mm x30",           "kind": "ammo",  "value": "9mm",     "amount": 30, "price": 30 },
+        { "name": "5.56 x60",          "kind": "ammo",  "value": "556",     "amount": 60, "price": 45 },
+        { "name": "12g x16",           "kind": "ammo",  "value": "12g",     "amount": 16, "price": 40 },
+        { "name": "Chart of the isle", "kind": "map",   "value": "",        "amount": 1,  "price": 150 },
+        { "name": "Sell deer hides",   "kind": "sell",  "value": "deer_hide", "amount": 0, "price": 35 },
+        { "name": "Sell boar hides",   "kind": "sell",  "value": "boar_hide", "amount": 0, "price": 50 }
+      ] },
+    { "id": "vargas", "name": "VARGAS PAWN & ARMS", "act": 1, "x": 528, "z": 640,
+      "offers": [
+        { "name": "Medkit",            "kind": "item",  "value": "medkit",  "amount": 1,  "price": 75 },
+        { "name": "Armor plate",       "kind": "item",  "value": "armor",   "amount": 1,  "price": 120 },
+        { "name": "9mm x30",           "kind": "ammo",  "value": "9mm",     "amount": 30, "price": 35 },
+        { "name": "5.56 x60",          "kind": "ammo",  "value": "556",     "amount": 60, "price": 55 },
+        { "name": "12g x16",           "kind": "ammo",  "value": "12g",     "amount": 16, "price": 45 },
+        { "name": "Ammo pouch",        "kind": "upgrade", "value": "pouch", "amount": 1,  "price": 400 },
+        { "name": "Sell scrap",        "kind": "sell",  "value": "scrap",   "amount": 0,  "price": 15 },
+        { "name": "Sell deer hides",   "kind": "sell",  "value": "deer_hide", "amount": 0, "price": 45 },
+        { "name": "Sell boar hides",   "kind": "sell",  "value": "boar_hide", "amount": 0, "price": 65 }
+      ] }
+  ],
+  "recipes": [
+    { "name": "Field medkit",   "herb": 2,                         "out": "medkit",  "amount": 1 },
+    { "name": "Bandage x2",     "herb": 1,                         "out": "bandage", "amount": 2 },
+    { "name": "Boar-hide plate","boar_hide": 2, "scrap": 1,        "out": "armor",   "amount": 1 },
+    { "name": "Deer-hide pouch","deer_hide": 3,                    "out": "pouch",   "amount": 1 }
+  ]
+}

@@ -72,6 +72,10 @@ static uint32_t key_buttons(const WinState *w) {
     if (w->key['Q'])         b |= BTN_RADIO;     /* M4: cycle radio (in cars) */
     if (w->key['K'])         b |= BTN_FERRY;     /* M4: ferry island <-> city */
     if (w->key['P'])         b |= BTN_PHOTO;
+    if (w->key['H'])         b |= BTN_HEAL;      /* M5 */
+    if (w->key['I'])         b |= BTN_CHAR;
+    if (w->key['L'])         b |= BTN_LOAD;
+    if (w->key[VK_F3])       b |= BTN_DEBUG;
     if (w->key[VK_TAB])      b |= BTN_MAP;
     if (w->key[VK_ESCAPE])   b |= BTN_MENU;
     if (w->key[VK_UP])       b |= BTN_UP;
@@ -105,6 +109,15 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 if (wp == 'Q')      w->edge |= BTN_RADIO;
                 if (wp == 'K')      w->edge |= BTN_FERRY;
                 if (wp == VK_ESCAPE) w->edge |= BTN_MENU;
+                if (wp == VK_TAB)   w->edge |= BTN_MAP;     /* M5: menus need edges */
+                if (wp == VK_UP)    w->edge |= BTN_UP;
+                if (wp == VK_DOWN)  w->edge |= BTN_DOWN;
+                if (wp == VK_LEFT)  w->edge |= BTN_LEFT;
+                if (wp == VK_RIGHT) w->edge |= BTN_RIGHT;
+                if (wp == 'H')      w->edge |= BTN_HEAL;
+                if (wp == 'I')      w->edge |= BTN_CHAR;
+                if (wp == 'L')      w->edge |= BTN_LOAD;
+                if (wp == VK_F3)    w->edge |= BTN_DEBUG;
             }
             w->key[wp] = 1;
         }
