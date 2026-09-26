@@ -22,6 +22,7 @@ dependencies).
 | **M4 — City Slice** | ✅ Meridian City: 8 blocks + harbor, 5 data-driven vehicles, 15 traffic cars, 30 peds, heat 0-5 with cruisers + heli, odd job, hot-dog economy, ferry between acts, 154-check city smoke |
 | **M5 — Systems & Progression** | ✅ XP/levels (100+50(n-1)), 24 skills in 4 trees wired to live systems, 2 data-driven vendors (economy.json), hunting/skinning, herbs, 4 crafting recipes, medkits/armor, island alert level, safehouses (rest+autosave), map screen + fast travel, saves/continue incl. wanted stars, island state persists across the ferry, 93-check systems smoke |
 | M5–M13 | not started |
+| M6 | Story: 11 data-driven missions, text cards, choices + 2 endings, tracker/waypoints, checkpoints | done (81 checks) |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

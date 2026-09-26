@@ -107,6 +107,8 @@ static void sys_build_city_extras(Game *g) {
     g->prog.ft[FT_JOB_BOARD].pos = g->city.job_board;
 }
 
+static void story_save(Game *g, SaveGame *s);          /* story.inl */
+static void story_load(Game *g, const SaveGame *s);
 /* ── island persistence across the ferry (and into saves) ── */
 void game_island_store(Game *g) {
     if (g->act != 0) return;
@@ -223,6 +225,7 @@ int game_shop_buy(Game *g, int vi, int oi) {
     } else if (o->kind == OFFER_MAP) {
         for (int i = 0; i < MAPW * MAPW; i++) if (!g->fog[i]) g->fog[i] = 1;
     }
+    if (o->kind != OFFER_SELL_MAT) g->stat_buys++;
     if (o->kind == OFFER_SELL_MAT) game_message(g, "SOLD - +$%d (cash $%d)", g->cash - before, g->cash);
     else game_message(g, "BOUGHT %s - $%d", o->name, before - g->cash);
     g->message_t = 1.8f;
@@ -310,6 +313,7 @@ int game_save(Game *g, int slot, int is_auto) {
     s.flag_count = 0;
     save_set_flag(&s, "island_saved", pr->island_saved);
     save_set_flag(&s, "mast_synced", pr->mast_synced);
+    story_save(g, &s);
     save_set_flag(&s, "xp_total", pr->xp_total);
     for (int i = 0; i < FT_N; i++) {
         char k[16]; snprintf(k, sizeof k, "ft_%d", i);
@@ -379,6 +383,7 @@ int game_load(Game *g, int slot, int is_auto) {
         static const float TH[6] = { 0.f, 1.f, 3.f, 6.f, 10.f, 15.f };
         heat_add_evidence(&g->city.heat, TH[pr->city_stars]);
     }
+    story_load(g, &s);
     g->mode = GM_PLAY;
     g->ui = UI_NONE;
     save_add_stat_ll(&s.stats.saves_loaded, 1);
@@ -399,6 +404,7 @@ int game_safehouse_rest(Game *g) {
     g->prog.ft_unlocked[g->act == 0 ? FT_ISLAND_SAFEHOUSE : FT_CITY_SAFEHOUSE] = 1;
     if (g->act == 0) g->prog.alert = dh_maxf(0.f, g->prog.alert - 20.f);   /* the island cools off */
     game_set_time(g, 0.04f);                     /* wake at ~07:00 */
+    g->stat_rests++;
     int ok = game_save(g, 0, 1);
     game_message(g, ok ? "RESTED UNTIL MORNING - GAME SAVED" : "RESTED - SAVE FAILED (disk?)");
     g->message_t = 3.f;
@@ -426,11 +432,13 @@ static int sys_interact(Game *g, const PlatInput *in) {
     return used;
 }
 
+static void story_frame(Game *g, float dt);   /* story.inl */
 static void sys_frame(Game *g, const PlatInput *in, float dt) {
     if (g->act == 0) prog_alert_tick(&g->prog, dt);
     else if (g->prog.last_stand_cd > 0.f) g->prog.last_stand_cd -= dt;
     if (in->pressed & BTN_HEAL) game_use_heal(g);
     sys_interact(g, in);
+    story_frame(g, dt);
     if (g->act == 1 && g->city.built) {
         if (!g->prog.ft_unlocked[FT_CITY_SAFEHOUSE] && v3_dist_xz(g->player.pos, g->safehouse[1]) < 15.f) {
             g->prog.ft_unlocked[FT_CITY_SAFEHOUSE] = 1;
@@ -450,7 +458,9 @@ static int ui_list_len(Game *g) {
     return 0;
 }
 
+static void story_card_input(Game *g, const PlatInput *in);   /* story.inl */
 static void sys_ui_input(Game *g, const PlatInput *in) {
+    if (g->ui == UI_CARD) { story_card_input(g, in); return; }
     uint32_t pr = in->pressed;
     if (pr & (BTN_MENU | BTN_PAUSE)) { g->ui = UI_NONE; return; }
     if (g->ui == UI_MAP && (pr & BTN_MAP)) { g->ui = UI_NONE; return; }

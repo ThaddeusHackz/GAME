@@ -58,6 +58,7 @@ GAME_SRC=(
   "$GAME/src/city/heat.c"
   "$GAME/src/city/city.c"
   "$GAME/src/meta/progress.c"
+  "$GAME/src/meta/mission.c"
   "$GAME/src/game/game.c"
 )
 PLAT_SRC_LINUX=(
@@ -97,7 +98,7 @@ compile_host() {
 }
 
 build_test() {
-  echo "══ [1/6] Linux headless test build (gcc) ══"
+  echo "══ [1/7] Linux headless test build (gcc) ══"
   local rc=0
   local exe="$BUILD/dh_smoke"
   compile_host "$exe" "${CORE_SRC[@]}" "$GAME/tests/smoke_core.c" \
@@ -123,6 +124,10 @@ build_test() {
   compile_host "$exe6" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
       "$GAME/tests/smoke_systems.c" || { echo "compile FAILED"; return 1; }
   run_smoke "$exe6" || rc=1
+  local exe7="$BUILD/dh_smoke_missions"
+  compile_host "$exe7" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/tests/smoke_missions.c" || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe7" || rc=1
   return $rc
 }
 
@@ -235,6 +240,7 @@ build_zip() {
   ( cd "$GAME/data" && [ -f weapons.json ] && zip -q -9 "$DIST/$name" weapons.json )
   ( cd "$GAME/data" && [ -f vehicles.json ] && zip -q -9 "$DIST/$name" vehicles.json )
   ( cd "$GAME/data" && [ -f economy.json ] && zip -q -9 "$DIST/$name" economy.json )
+  ( cd "$GAME/data" && [ -f missions.json ] && zip -q -9 "$DIST/$name" missions.json )
   echo "   ✓ dist/$name ($(du -h "$DIST/$name" | cut -f1))"
 }
 

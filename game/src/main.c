@@ -37,6 +37,7 @@ typedef struct {
     int   verbose;
     int   arena;               /* M2: start in the combat arena with N hostiles (0=off) */
     int   outpost;             /* M3: start at the outpost DoD beach (0=off) */
+    int   story;               /* M6: -1 auto, 0 off, 1 on */
     int   night;               /* M3: begin at night to show the day/night cycle */
     int   city;                /* M4: boot straight into Meridian City (act II) */
 } LaunchOpts;
@@ -45,6 +46,7 @@ static void usage(void) {
     printf(
 "DIVIDED HORIZON v" DH_VERSION_STRING " (" DH_BUILD_NAME ")\n"
 "Usage: DividedHorizon [options]\n"
+"  --story / --no-story  force the M6 campaign on/off (default: on when windowed)\n"
 "  --headless          run without a window; captures frames to disk\n"
 "  --script <file>     headless input script (key/shot/end lines)\n"
 "  --shots <dir>       where headless captures are written (default ./shots)\n"
@@ -69,6 +71,7 @@ static int parse_args(int argc, char **argv, LaunchOpts *o) {
     o->w = 0; o->h = 0;
     o->duration = 0.0f;
     o->backend = -1;                 /* -1 = auto */
+    o->story = -1;                   /* M6: auto */
     o->seed = 0xD1CE5EEDu;
     o->shot_dir = "shots";
     for (int i = 1; i < argc; i++) {
@@ -86,6 +89,8 @@ static int parse_args(int argc, char **argv, LaunchOpts *o) {
         }
         else if (!strcmp(a, "--outpost")) o->outpost = 1;
         else if (!strcmp(a, "--night"))   o->night = 1;
+        else if (!strcmp(a, "--story"))   o->story = 1;
+        else if (!strcmp(a, "--no-story")) o->story = 0;
         else if (!strcmp(a, "--city"))    o->city = 1;
         else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) o->verbose = 1;
         else if (!strcmp(a, "-h") || !strcmp(a, "--help")) { usage(); return 0; }
@@ -152,6 +157,9 @@ int main(int argc, char **argv) {
         dh_log_shutdown();
         return 3;
     }
+    /* M6: the campaign runs in the real game; DoD/test modes stay sandbox */
+    if (o.story < 0) o.story = !(o.headless || o.arena || o.outpost || o.city);
+    game.story = o.story;
     if (!o.menu_first && o.headless) game_start_play(&game);
     if (o.menu_first) game.mode = GM_MENU;
     if (o.outpost) game_outpost_start(&game);            /* M3 island DoD beach */

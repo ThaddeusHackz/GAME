@@ -123,6 +123,7 @@ typedef struct {
     uint32_t fog_bits[64 * 64 / 32];
     int      city_stars;                   /* wanted persistence */
     float    last_stand_cd;
+    int      ev_count[EV_N];               /* M6: lifetime event tallies (missions) */
 } Progress;
 
 void  prog_init(Progress *p);

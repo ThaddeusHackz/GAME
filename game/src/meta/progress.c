@@ -95,6 +95,7 @@ static void alert_add(Progress *p, float amt) {
 int prog_event(Progress *p, ProgEvent ev, int arg) {
     (void)arg;
     if ((int)ev < 0 || ev >= EV_N) return 0;
+    p->ev_count[ev]++;
     switch (ev) {
     case EV_LOUD_SHOT:       alert_add(p, 0.6f); break;
     case EV_ALARM:           alert_add(p, 30.f); break;

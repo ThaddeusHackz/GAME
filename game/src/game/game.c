@@ -1150,6 +1150,7 @@ static void combat_pickups_update(Game *g, float dt)
                 game_message(g, "MEDKIT +%.0f HP", (double)k->amount);
             } else if (k->kind == PK_HERB) {
                 g->prog.mat[MAT_HERB]++;
+                g->stat_herbs++;
                 game_message(g, "HERB +1 (%d) - craft medkits (I)", g->prog.mat[MAT_HERB]);
             } else if (k->kind == PK_SCRAP) {
                 g->prog.mat[MAT_SCRAP]++;
@@ -1883,6 +1884,7 @@ void game_load_city(Game *g) {
     DH_INFO("game", "loading act II: Meridian City (world swap, Spec 4.3)");
     game_island_store(g);        /* M5: the island remembers what you did */
     g->act = 1;
+    g->stat_ferries++;
     g->in_vehicle = -1;
     /* clear act-I dynamic content */
     g->enemies.count = 0; g->enemies.alive_count = 0;
@@ -1929,6 +1931,7 @@ void game_load_island(Game *g) {
     if (!g || !g->ready) return;
     DH_INFO("game", "loading act I: Isla Sombra (ferry return)");
     g->act = 0;
+    g->stat_ferries++;
     g->in_vehicle = -1;
     g->city.built = 0;
     g->prop_count = 0;
@@ -2023,6 +2026,8 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     g->day_t = 0.08f;                 /* ~07:55 — Act I jade-and-gold morning */
     prog_init(&g->prog);              /* M5: xp / skills / economy */
     economy_load(&g->econ);
+    missions_load(&g->missions);     /* M6: story campaign (data file or embedded) */
+    mission_reset(&g->ms);
     save_init();
     build_island(g);
 
@@ -2068,6 +2073,7 @@ void game_free(Game *g) {
 /* ══════════════════════════════ simulation ══════════════════════════════ */
 
 #include "systems.inl"   /* M5 systems & progression glue */
+#include "story.inl"     /* M6 story missions glue */
 
 void game_frame(Game *g, const PlatInput *in, float dt) {
     if (!g || !g->ready || !in) return;
@@ -2196,6 +2202,7 @@ void game_frame(Game *g, const PlatInput *in, float dt) {
                 g->in_vehicle = -1;
             }
             player_respawn(&g->player, g->spawn);
+            if (g->story) { MissionCtx mc; story_ctx(g, &mc); mission_on_death(&g->ms, &g->missions, &mc); }
             g->damage_flash = 0.0f;
             g->reloading = 0;
             game_message(g, "RESPAWNED at checkpoint - loadout kept, %d hostiles remain",
@@ -2408,6 +2415,16 @@ static void draw_minimap(Game *g) {
             MM_ICON(g->player.pos.x + cosf(g->city.heli_ang) * 18.0f,
                     g->player.pos.z + sinf(g->city.heli_ang) * 18.0f,
                     0xC04040F0u, 4.0f * ui);
+    }
+    {   /* M6: mission waypoint (clamped to the plate edge when far) */
+        Vec3 wp;
+        if (story_waypoint(g, &wp)) {
+            float dx = (wp.x - p->pos.x) * scale, dz = (wp.z - p->pos.z) * scale;
+            float lim = mm * 0.5f - 4.0f * ui, mxv = fmaxf(fabsf(dx), fabsf(dz));
+            if (mxv > lim) { dx *= lim / mxv; dz *= lim / mxv; }
+            rend_quad2d(mx + mm * 0.5f + dx - 3.0f * ui, my + mm * 0.5f + dz - 3.0f * ui,
+                        6.0f * ui, 6.0f * ui, -1, 0,0,1,1, 0xFF00C8FFu);
+        }
     }
     #undef MM_ICON
 
@@ -2689,6 +2706,7 @@ static void draw_hud(Game *g) {
         font_text_shadow(W - pad - 210.0f * ui, H - pad - 85.0f * ui, fs * 0.8f, buf, C_DIM);
     }
     sys_draw_hud(g);
+    story_draw_hud(g);
 }
 
 static void draw_menu(Game *g) {

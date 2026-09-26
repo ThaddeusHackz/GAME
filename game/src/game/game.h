@@ -21,11 +21,12 @@
 #include "../ai/enemy.h"
 #include "../city/city.h"
 #include "../meta/progress.h"
+#include "../meta/mission.h"
 
 #define GAME_MAX_PROPS 640
 
 typedef enum { GM_MENU = 0, GM_PLAY, GM_PAUSE, GM_PHOTO } GameMode;
-typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP } GameUi;
+typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP, UI_CARD } GameUi;
 
 typedef struct {
     Mat4     model;
@@ -204,6 +205,14 @@ typedef struct Game {
     Economy      econ;           /* vendors + recipes (data/economy.json) */
     int          ui;             /* GameUi — modal screens pause the sim */
     int          ui_sel, ui_tab, ui_vendor;
+    /* M6: story missions (Spec §73) */
+    int          story;          /* 1 = campaign runs (off in tests / DoD modes) */
+    MissionSet   missions;
+    MissionState ms;
+    int          stat_herbs, stat_buys, stat_rests, stat_ferries;
+    int          card_page, card_result, card_pick;
+    float        mission_banner_t;
+    char         mission_banner[96];
     float        armor;          /* 0..100 plate pool, absorbs 60% of damage */
     Vec3         safehouse[2];   /* act 0 / act 1 safehouse doors */
     int          saves_written;
@@ -235,6 +244,7 @@ void  game_set_time(Game *g, float day_t);
 void  game_frame(Game *g, const PlatInput *in, float dt);   /* simulate only */
 /* ── M5 systems API (also driven by tests/smoke_systems.c) ── */
 void  game_apply_skills(Game *g);                /* push skill mods into player */
+int   game_story_waypoint(Game *g, Vec3 *out);  /* M6: current mission waypoint */
 int   game_ammo_cap(const Game *g, int ammo);    /* reserve cap incl. pack mule/pouch */
 int   game_shop_buy(Game *g, int vendor, int offer);   /* 0 ok, <0 error */
 int   game_fast_travel(Game *g, int node);       /* 0 ok, <0 error (see progress.h) */

@@ -237,6 +237,7 @@ static void sys_draw_screen(Game *g) {
     case UI_MAP:  draw_map_screen(g); break;
     case UI_CHAR: draw_char_screen(g); break;
     case UI_SHOP: draw_shop_screen(g); break;
+    case UI_CARD: story_draw_card(g); break;
     default: break;
     }
 }
