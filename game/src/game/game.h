@@ -45,6 +45,8 @@ typedef struct {
     int   beat_i, beaten;            /* beaten: bitmask of bosses defeated */
     float bomb_t, hand_ang, hand_spd, expose_t;   /* B2 El Reloj */
     int   bomb_live, dets, cycle, prompt_who, drawn;
+    float pass_t, window_t, sweep_t, tide_r, lane_x;   /* B3 Dona Marea */
+    int   lines, strafe_hits, harpoon_used, passes, in_pass, lane_hit;
     int   fights, losses, clean_mask; /* clean_mask: beaten above half health */
 } Bosses;
 
@@ -351,6 +353,8 @@ Vec3  game_boss_drum_pos(const Game *g);        /* world war-drum that starts B1
 Vec3  game_boss_clock_pos(const Game *g);
 float game_boss_hand_dist(const Game *g, Vec3 p);       /* clock dial that starts B2 */
 Vec3  game_boss_bomb_pos(const Game *g, int k); /* B2 bomb column k (0..3) */
+Vec3  game_boss_bell_pos(const Game *g);        /* B3 harbour bell (calls Dona Marea) */
+Vec3  game_boss_buoy_pos(const Game *g, int k); /* B3 fuel-line buoy k (0..2) */
 /* M13 bounty squad */
 int   game_cob_spawn(Game *g, int who);
 int   game_cob_fallen(const Game *g);

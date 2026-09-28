@@ -408,6 +408,8 @@ static void build_combat_arena(Game *g)
     prop_top_box(g, A.x + 8.f, h + 1.0f, A.z - 38.f, 0.6f, 0.5f, 0.6f, WOOD, 0xFF2020C0u);
     /* M14: El Reloj's clock dial — wind it (E) to call the B2 fight */
     prop_top_box(g, A.x - 8.f, h + 1.6f, A.z - 38.f, 0.7f, 0.8f, 0.15f, CONC, 0xFF40C0E0u);
+    /* M16: Dona Marea's harbour bell - ring it (E) to call the B3 fight */
+    prop_top_box(g, A.x - 24.f, h + 1.8f, A.z - 38.f, 0.5f, 0.6f, 0.5f, CONC, 0xFF20A0D0u);
     DH_INFO("game", "combat arena built at (%.0f,%.0f) deck %.1f m", A.x, A.z, h);
 }
 

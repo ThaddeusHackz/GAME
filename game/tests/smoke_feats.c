@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     if (!game_init(&g, 640, 360, REND_SOFT, 0x12F0u)) { CHECK(0, "game_init"); return 1; }
     game_start_play(&g);
     run(&g, 0, 40);
-    CHECK(game_feat_count() == 28, "28 feats defined");
+    CHECK(game_feat_count() == 29, "29 feats defined");
     int secrets = 0; for (int i = 0; i < game_feat_count(); i++) secrets += game_feat_secret(i);
     CHECK(secrets == 2, "2 secret feats");
     CHECK(game_feats_stamped(&g) == 0, "fresh game: nothing stamped (got=%x)", g.feats.got);

@@ -32,6 +32,7 @@ dependencies).
 | M14 | Boss B1 La Sargento: cadence shield wall, 3 phases | 889/889 | [report](docs/reports/M14_report.md) |
 | M15 | Boss B2 El Reloj: bomb columns, clock-hand sweep, 3 phases | 917/917 | [report](docs/reports/M15_report.md) |
 | M15b | El Reloj hand + bomb columns visible in world | 14 suites / 918 checks |
+| M16 | Boss B3 Doña Marea: gunship runs + harpoon windows, anchor sweep, rising tide at sunset | 15 suites / 956 checks |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

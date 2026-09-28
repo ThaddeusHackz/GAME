@@ -26,11 +26,31 @@
    P3 MEDIANOCHE: the hand reverses at 0.85 rad/s and El Reloj speeds up.
    Clean win (zero detonations) = SINCRONIZADO. Honest deviations: the hand and
    bombs are drawn as simple box markers (M15b), not bespoke models; officer mesh
-   reused; text barks only. Bosses 3–6 NOT built. */
+   reused; text barks only.
+
+   Slot B3: DONA MAREA (M16). Ring the harbour bell at the yard's north-west
+   corner (E). The fight is forced to SUNSET (18:30) - spec 43.2 lighting law.
+     P1 GUNSHIP RUNS: her armoured gunship strafes a north-south lane across
+        the yard every 9 s (2.5 s pass; 30 HP/s inside 2.5 m of the lane,
+        telegraphed by a red lane marker 2 s ahead). After each pass a 4 s
+        HARPOON WINDOW opens: hold E within 2.5 m of one of 3 fuel-line buoys
+        on the west edge to cut it. Marea is untouchable (armor 0.95) until
+        all 3 lines are cut - the gunship sinks and she lands.
+     P2 PIER BRAWL (<100% after landing): anchor-chain sweep every 5 s, 3 m
+        radius, 15 dmg + shove. Two burning-boat deckhands join.
+     P3 TIDE RISING (<33%): the dry ground shrinks from 30 m to 10 m radius
+        (1 m/s); outside it the tide burns 10 HP/s. One harpoon left: E within
+        4 m of her lands a 15%-max-HP strike, once.
+   Down line: "The water... keeps what it wants." Clean win (never hit by a
+   strafe run and never below half health) = LA AGUA CUSTODIA.
+   Honest deviations: land arena, not docks + real boats; the gunship and
+   buoys are box markers; no fire/pier geometry; officer mesh; text only.
+   Bosses 4-6 NOT built. */
 
 #define BOSS_FACTION 5
 static const char *k_boss_phase[4] = { "", "FORMAR", "CORREGIR", "MAS FUERTE!" };
 static const char *k_reloj_phase[4] = { "", "TIC", "TAC", "MEDIANOCHE!" };
+static const char *k_marea_phase[4] = { "", "GUNSHIP RUNS", "PIER BRAWL", "TIDE RISING!" };
 
 int game_boss_active(const Game *g) { return g->boss.active ? g->boss.who : -1; }
 int game_boss_phase(const Game *g)  { return g->boss.active ? g->boss.phase : 0; }
@@ -41,6 +61,13 @@ Vec3 game_boss_bomb_pos(const Game *g, int k) {
     p.y = terrain_height(&g->terrain, p.x, p.z); return p;
 }
 #define RELOJ_R 26.f
+Vec3 game_boss_bell_pos(const Game *g) { return v3_add(g->arena_center, v3(-24.f, 0.f, -38.f)); }
+Vec3 game_boss_buoy_pos(const Game *g, int k) {
+    Vec3 p = v3_add(g->arena_center, v3(-22.f, 0.f, -12.f + 12.f * (float)k));
+    p.y = terrain_height(&g->terrain, p.x, p.z); return p;
+}
+#define MAREA_PASS 2.5f
+#define MAREA_CYCLE 9.f
 
 static int boss_alive(const Game *g, int slot) {
     return slot >= 0 && slot < g->enemies.count && g->enemies.v[slot].faction == BOSS_FACTION &&
@@ -52,6 +79,7 @@ static int boss_drums_up(const Game *g) {
 int game_boss_shielded(const Game *g) {
     const Bosses *B = &g->boss;
     if (B->active && B->who == 1) return B->expose_t <= 0.f;
+    if (B->active && B->who == 2) return B->lines != 0;
     return B->active && B->phase < 3 && B->stagger_t <= 0.f && boss_drums_up(g);
 }
 
@@ -89,8 +117,28 @@ static int reloj_start(Game *g) {
     return 1;
 }
 
+static int marea_start(Game *g) {
+    Bosses *B = &g->boss;
+    if (g->enemies.count + 3 > ENEMY_MAX) return 0;
+    memset(B->drum, -1, sizeof B->drum); memset(B->shield, -1, sizeof B->shield);
+    memset(B->flank, -1, sizeof B->flank);
+    B->slot = boss_spawn_at(g, 0.f, 24.f, EN_OFFICER, 9.f);
+    if (B->slot < 0) return 0;
+    B->active = 1; B->who = 2; B->phase = 1; B->clean = 1; B->t = 0.f; B->stun_t = 0.f;
+    B->lines = 0x7; B->pass_t = 4.f; B->window_t = 0.f; B->sweep_t = 5.f; B->tide_r = 30.f;
+    B->strafe_hits = 0; B->harpoon_used = 0; B->passes = 0; B->in_pass = 0; B->lane_hit = 0;
+    B->lane_x = 0.f;
+    B->fights++;
+    game_set_time(g, 0.52f);                         /* 18:30 - sunset is mandatory */
+    game_message(g, "DONA MAREA: \"You came to my water. The water sends its regards.\"");
+    g->message_t = 4.f;
+    pol_cue(g, SFX_SIREN, 0.7f, 0.6f);
+    return 1;
+}
+
 int game_boss_start(Game *g, int who) {
     Bosses *B = &g->boss;
+    if (who == 2 && !B->active && g->act == 0 && !g->arena_active) return marea_start(g);
     if (who == 1 && !B->active && g->act == 0 && !g->arena_active) return reloj_start(g);
     if (who != 0 || B->active || g->act != 0 || g->arena_active) return 0;   /* only B1 exists */
     if (g->enemies.count + 11 > ENEMY_MAX) return 0;
@@ -126,7 +174,8 @@ static void boss_win(Game *g) {
     prog_add_xp(&g->prog, 500);
     game_stature_add(g, 5.f);
     game_herald_print(g, HT_BOSS, who);
-    game_message(g, who == 1 ? "EL RELOJ: \"Synchronized... at last.\"" : "LA SARGENTO: \"The unit... stands.\"");
+    game_message(g, who == 2 ? "DONA MAREA: \"The water... keeps what it wants.\"" :
+                    who == 1 ? "EL RELOJ: \"Synchronized... at last.\"" : "LA SARGENTO: \"The unit... stands.\"");
     g->message_t = 5.f;
     pol_cue(g, SFX_MISSION, 0.9f, 1.0f);
 }
@@ -210,14 +259,102 @@ static void reloj_frame(Game *g, const PlatInput *in, float dt) {
         p->health = dh_clampf(p->health - 25.f * dt, 0.f, p->health_max);
 }
 
+
+static int marea_line_count(int m) { int n = 0; for (int k = 0; k < 3; k++) n += (m >> k) & 1; return n; }
+/* lane x offset for pass n: sweeps across the yard so no spot is safe forever */
+static float marea_lane_for(int n) { static const float L[5] = { 0.f, -12.f, 10.f, -4.f, 16.f }; return L[n % 5]; }
+
+static void marea_frame(Game *g, const PlatInput *in, float dt) {
+    Bosses *B = &g->boss;
+    Player *p = &g->player;
+    Enemy *m = &g->enemies.v[B->slot];
+    Vec3 A = g->arena_center;
+    float f = m->health / m->health_max;
+    if (B->phase == 1) {
+        /* gunship cycle */
+        B->pass_t -= dt;
+        if (!B->in_pass && B->pass_t <= 0.f) {
+            B->in_pass = 1; B->pass_t = MAREA_PASS; B->lane_hit = 0;
+            pol_cue(g, SFX_SHOT_RIFLE, 0.9f, 0.7f);
+        } else if (B->in_pass && B->pass_t <= 0.f) {
+            B->in_pass = 0; B->passes++; B->window_t = 4.f;
+            B->pass_t = MAREA_CYCLE - MAREA_PASS; B->lane_x = marea_lane_for(B->passes);
+            game_message(g, "The gunship turns - HARPOON WINDOW! Cut a fuel line (E at a buoy)");
+            g->message_t = 2.5f;
+        }
+        if (B->in_pass) {
+            float dx = fabsf(p->pos.x - (A.x + B->lane_x));
+            if (dx < 2.5f && fabsf(p->pos.z - A.z) < 34.f) {
+                p->health = dh_clampf(p->health - 30.f * dt, 0.f, p->health_max);
+                if (!B->lane_hit) { B->lane_hit = 1; B->strafe_hits++; B->clean = 0; }
+            }
+        }
+        if (B->window_t > 0.f) {
+            B->window_t -= dt;
+            if (in && (in->pressed & BTN_USE))
+                for (int k = 0; k < 3; k++) {
+                    if (!((B->lines >> k) & 1)) continue;
+                    Vec3 d = v3_sub(game_boss_buoy_pos(g, k), p->pos); d.y = 0.f;
+                    if (v3_len(d) < 2.5f) {
+                        B->lines &= ~(1 << k); B->window_t = 0.f;
+                        pol_cue(g, SFX_CARD, 0.8f, 0.8f);
+                        if (!B->lines) {
+                            B->phase = 2; B->sweep_t = 5.f;
+                            for (int j = 0; j < 2; j++) B->flank[j] = boss_spawn_at(g, j ? 10.f : -10.f, 18.f, EN_GRUNT, 1.f);
+                            game_message(g, "DONA MAREA: \"My ship! Fine - I'll drown you by hand.\"");
+                        } else snprintf(g->message, sizeof g->message, "Fuel line cut - %d left", marea_line_count(B->lines));
+                        g->message_t = 3.f;
+                        break;
+                    }
+                }
+        }
+    } else {
+        if (B->phase == 2 && f < 0.33f) {
+            B->phase = 3; m->speed *= 1.3f;
+            game_message(g, "DONA MAREA: \"The tide is coming in, dear. It always does.\""); g->message_t = 3.f;
+        }
+        /* anchor-chain sweep */
+        B->sweep_t -= dt;
+        if (B->sweep_t <= 0.f) {
+            B->sweep_t = 5.f;
+            Vec3 d = v3_sub(p->pos, m->pos); d.y = 0.f;
+            float L = v3_len(d);
+            if (L < 3.f) {
+                p->health = dh_clampf(p->health - 15.f, 0.f, p->health_max);
+                if (L > 0.01f) { p->vel.x += d.x / L * 8.f; p->vel.z += d.z / L * 8.f; }
+                game_message(g, "ANCHOR CHAIN! You're swept back."); g->message_t = 1.5f;
+            }
+            pol_cue(g, SFX_HIT, 0.8f, 0.5f);
+        }
+        if (B->phase == 3) {
+            if (B->tide_r > 10.f) B->tide_r = fmaxf(10.f, B->tide_r - dt);
+            Vec3 d = v3_sub(p->pos, A); d.y = 0.f;
+            if (v3_len(d) > B->tide_r) p->health = dh_clampf(p->health - 10.f * dt, 0.f, p->health_max);
+            if (!B->harpoon_used && in && (in->pressed & BTN_USE)) {
+                Vec3 e = v3_sub(m->pos, p->pos); e.y = 0.f;
+                if (v3_len(e) < 4.f) {
+                    B->harpoon_used = 1;
+                    float a = m->armor; m->armor = 0.f;
+                    enemy_apply_damage(m, m->health_max * 0.15f, 0);
+                    m->armor = a;
+                    game_message(g, "THE LAST HARPOON - it bites deep!"); g->message_t = 2.f;
+                    pol_cue(g, SFX_KILL, 0.9f, 0.7f);
+                }
+            }
+        }
+    }
+    boss_set_armor(g, 0);
+    if (boss_alive(g, B->slot)) m->armor = B->lines ? 0.95f : 0.f;
+}
+
 static void boss_frame(Game *g, const PlatInput *in, float dt) {
     Bosses *B = &g->boss;
     if (B->prompt_t > 0.f) B->prompt_t -= dt;
     if (g->mode != GM_PLAY) return;
     if (!B->active) {
         if (g->act != 0 || g->arena_active) return;
-        for (int w = 0; w < 2; w++) {
-            Vec3 d = v3_sub(w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
+        for (int w = 0; w < 3; w++) {
+            Vec3 d = v3_sub(w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
             if (v3_len(d) < 3.f) {
                 B->prompt_t = 0.2f; B->prompt_who = w;
                 if (in && (in->pressed & BTN_USE)) game_boss_start(g, w);
@@ -233,12 +370,14 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (p->health < p->health_max * 0.5f) B->clean = 0;
     if (player_is_down(p)) {
         boss_clear(g); B->losses++;
-        game_message(g, B->who == 1 ? "The clock stops for you. Wind the dial to try again." :
+        game_message(g, B->who == 2 ? "The tide takes you. Ring the harbour bell to try again." :
+                        B->who == 1 ? "The clock stops for you. Wind the dial to try again." :
                                       "The drums fade. Beat the war drum to try again."); g->message_t = 4.f;
         return;
     }
     if (g->enemies.v[B->slot].state == EN_DEAD) { boss_win(g); return; }
     if (B->who == 1) { reloj_frame(g, in, dt); return; }
+    if (B->who == 2) { marea_frame(g, in, dt); return; }
 
     /* drummer deaths → stagger */
     for (int k = 0; k < 2; k++) {
@@ -301,6 +440,41 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
 static void boss_draw_world(Game *g) {
     Bosses *B = &g->boss;
     B->drawn = 0;
+    if (B->active && B->who == 2) {
+        Vec3 A = g->arena_center;
+        if (B->phase == 1) {
+            /* telegraph lane (red) 2 s before + during a pass; gunship box rides it */
+            float lx = A.x + B->lane_x;
+            int warn = B->in_pass || B->pass_t < 2.f;
+            if (warn) for (int i = 0; i < 9; i++) {
+                float z = A.z - 32.f + 8.f * (float)i;
+                Mat4 mm = m4_mul(m4_translate(v3(lx, terrain_height(&g->terrain, lx, z) + 0.1f, z)),
+                                 m4_scale(v3(5.f, 0.2f, 7.f)));
+                rend_mesh_lit(g->mesh_box, &mm, -1, B->in_pass ? 0xFF1010FFu : 0xFF3030A0u, 1.f, 1, 1, 1, 0, 1);
+                B->drawn++;
+            }
+            float gz = B->in_pass ? A.z - 34.f + 68.f * (1.f - B->pass_t / MAREA_PASS) : A.z + 44.f;
+            Mat4 gm = m4_mul(m4_translate(v3(lx, terrain_height(&g->terrain, lx, gz) + 6.f, gz)),
+                             m4_scale(v3(4.f, 2.5f, 10.f)));
+            rend_mesh_lit(g->mesh_box, &gm, -1, 0xFF404858u, 1.f, 1, 1, 1, 0, 1); B->drawn++;
+            for (int k = 0; k < 3; k++) {
+                Vec3 q = game_boss_buoy_pos(g, k);
+                int live = (B->lines >> k) & 1;
+                uint32_t c = !live ? 0xFF606060u : (B->window_t > 0.f ? 0xFF20E0FFu : 0xFF2090E0u);
+                Mat4 bm = m4_mul(m4_translate(v3(q.x, q.y + 0.9f, q.z)), m4_scale(v3(1.f, live ? 1.8f : 0.4f, 1.f)));
+                rend_mesh_lit(g->mesh_box, &bm, -1, c, 1.f, 1, 1, 1, 0, 1); B->drawn++;
+            }
+        } else if (B->phase == 3) {
+            /* tide edge: 16 posts on the shrinking dry ring */
+            for (int i = 0; i < 16; i++) {
+                float a = (float)i * 0.3927f, x = A.x + sinf(a) * B->tide_r, z = A.z + cosf(a) * B->tide_r;
+                Mat4 tm = m4_mul(m4_translate(v3(x, terrain_height(&g->terrain, x, z) + 0.5f, z)),
+                                 m4_scale(v3(0.5f, 1.f, 0.5f)));
+                rend_mesh_lit(g->mesh_box, &tm, -1, 0xFFD08020u, 1.f, 1, 1, 1, 0, 1); B->drawn++;
+            }
+        }
+        return;
+    }
     if (!B->active || B->who != 1) return;
     Vec3 A = g->arena_center;
     float dx = sinf(B->hand_ang), dz = cosf(B->hand_ang);
@@ -332,7 +506,10 @@ static void boss_draw_hud(Game *g) {
     float ui = settings()->ui_scale, fs = 1.6f * ui;
     if (!B->active) {
         if (B->prompt_t > 0.f) {
-            const char *t = B->prompt_who == 1 ?
+            const char *t = B->prompt_who == 2 ?
+                            ((B->beaten & 4) ? "[E] RING THE HARBOUR BELL - rematch DONA MAREA"
+                                             : "[E] RING THE HARBOUR BELL - challenge DONA MAREA") :
+                            B->prompt_who == 1 ?
                             ((B->beaten & 2) ? "[E] WIND THE CLOCK - rematch EL RELOJ"
                                              : "[E] WIND THE CLOCK - challenge EL RELOJ") :
                             (B->beaten & 1) ? "[E] BEAT THE WAR DRUM - rematch LA SARGENTO"
@@ -346,13 +523,23 @@ static void boss_draw_hud(Game *g) {
     }
     float w = (float)g->w * 0.5f, x = (float)g->w * 0.25f, y = 34.f * ui;
     char b[96];
-    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
+    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
     font_text(x, y - 16.f * ui, fs, b, 0xFF60A0FF);
     rend_quad2d(x, y, w, 8.f * ui, -1, 0, 0, 1, 1, 0xC0101010);
     if (B->slot >= 0 && B->slot < g->enemies.count) {
         const Enemy *e = &g->enemies.v[B->slot];
         float f = e->health_max > 0.f ? e->health / e->health_max : 0.f;
         rend_quad2d(x, y, w * f, 8.f * ui, -1, 0, 0, 1, 1, 0xFF2030D0);
+    }
+    if (B->who == 2) {
+        if (B->phase == 1) {
+            if (B->window_t > 0.f) snprintf(b, sizeof b, "HARPOON WINDOW %.1fs - cut a fuel line! (%d left)", B->window_t, marea_line_count(B->lines));
+            else if (B->in_pass) snprintf(b, sizeof b, "STRAFE RUN - get off the red lane!");
+            else snprintf(b, sizeof b, "FUEL LINES %d/3  -  gunship in %d s", marea_line_count(B->lines), (int)ceilf(B->pass_t));
+        } else if (B->phase == 3) snprintf(b, sizeof b, "TIDE RISING - dry ground %.0f m%s", B->tide_r, B->harpoon_used ? "" : "  -  [E] last harpoon (4 m)");
+        else snprintf(b, sizeof b, "PIER BRAWL - mind the anchor chain (3 m)");
+        font_text(x, y + 11.f * ui, fs * 0.85f, b, B->window_t > 0.f ? 0xFF40E0FF : 0xFF4080FF);
+        return;
     }
     if (B->who == 1) {
         if (B->expose_t > 0.f) snprintf(b, sizeof b, "EXPOSED %.1fs - FIRE!", B->expose_t);
