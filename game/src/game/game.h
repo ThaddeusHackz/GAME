@@ -37,6 +37,14 @@ typedef struct {
     float    check_acc;
 } Feats;
 
+/* M13: Los Cobradores bounty squad (Spec 26.2) */
+#define COB_N 4
+typedef struct {
+    float infamy, prev_raw, cd, t, tag_t, warn_t;
+    int   primed, active, who, slot, goons, next, trinket;
+    int   enc[COB_N];                 /* defeats per hunter; 3 = fallen */
+} Cobradores;
+
 /* M11: Stature (hidden hero/renegade slider, Spec 26.4) + the Herald (Spec 27) */
 #define HERALD_MAX 24
 typedef struct { int tmpl, tone, day, val, act; uint32_t seed; } HeraldPage;
@@ -277,6 +285,7 @@ typedef struct Game {
     char         ph_last[200];
     Legend       leg;                     /* M11 */
     Feats        feats;                   /* M12 */
+    Cobradores   cob;                     /* M13 */
 } Game;
 
 int   game_init(Game *g, int w, int h, int backend, uint32_t seed);
@@ -320,6 +329,12 @@ const char *game_stature_name(const Game *g);
 void  game_stature_add(Game *g, float d);
 int   game_herald_headline(const Game *g, int page, char *out, int cap);
 int   game_herald_print(Game *g, int tmpl, int val);   /* returns page index */
+/* M13 bounty squad */
+int   game_cob_spawn(Game *g, int who);
+int   game_cob_fallen(const Game *g);
+int   game_cob_active(const Game *g);          /* hunter index or -1 */
+float game_cob_infamy(const Game *g);
+const char *game_cob_name(int who);
 /* M12 feats */
 int   game_feat_count(void);
 int   game_feats_stamped(const Game *g);

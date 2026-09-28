@@ -31,6 +31,8 @@ static void  herald_draw_banner(struct Game *g);
 static void  feats_frame(struct Game *g, float dt);
 static void  feats_input(struct Game *g, const PlatInput *in);
 static void  feats_draw_toast(struct Game *g);
+static void  cob_frame(struct Game *g, float dt);
+static void  cob_draw_hud(struct Game *g);
 static void  herald_input(struct Game *g, const PlatInput *in);
 
 /* ── world constants ───────────────────────────────────────────────────── */
@@ -2258,6 +2260,7 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     if (g->act == 1) city_frame(&g->city, g, in, dt);
     legend_frame(g, dt);                     /* M11 stature + Herald */
     feats_frame(g, dt);                      /* M12 feats */
+    cob_frame(g, dt);                        /* M13 bounty squad */
 
     /* ── photo mode / debug toggles ── */
     if ((in->pressed & BTN_PHOTO) && game_photo_enter(g)) {
@@ -2487,6 +2490,7 @@ static void draw_minimap(Game *g) {
 #include "photo.inl"        /* M9 photo mode */
 #include "herald.inl"       /* M11 stature + the Herald */
 #include "feats.inl"        /* M12 feats poster */
+#include "cobradores.inl"   /* M13 bounty squad */
 
 static void draw_hud(Game *g) {
     Settings *s = settings();
@@ -2839,6 +2843,7 @@ void game_render(Game *g) {
             poncho_draw_hud(g);
             herald_draw_banner(g);
             feats_draw_toast(g);
+            cob_draw_hud(g);
             if (g->ui != UI_NONE) sys_draw_screen(g);
             const Player *pp = &g->player;
             if (pp->stance != PL_ST_ZIP && pp->zips) {

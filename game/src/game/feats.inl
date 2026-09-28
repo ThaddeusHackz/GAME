@@ -28,6 +28,8 @@ static int ft_revive(Game *g)    { return g->dog.revives >= 1; }
 static int ft_level(Game *g)     { return g->prog.level >= 10; }
 static int ft_chapters(Game *g)  { int n = 0; for (uint32_t m = (uint32_t)g->ms.done_mask; m; m &= m - 1) n++; return n >= 6; }
 static int ft_ending(Game *g)    { return g->ms.ending != 0; }
+static int ft_cob1(Game *g)      { return g->cob.enc[0] + g->cob.enc[1] + g->cob.enc[2] + g->cob.enc[3] >= 1; }
+static int ft_cob4(Game *g)      { return g->cob.trinket; }
 static int ft_s_distract(Game *g){ return g->dog.distracts >= 5; }
 static int ft_s_menacedog(Game *g){ return ft_menace(g) && ft_bond5(g); }
 
@@ -54,6 +56,8 @@ static const struct { const char *name, *desc; FeatFn fn; int secret; } k_feats[
     { "SEASONED",           "Reach level 10.",                            ft_level, 0 },
     { "CHAPTER AND VERSE",  "Complete 6 story missions.",                 ft_chapters, 0 },
     { "THE LAST PAGE",      "See an ending.",                             ft_ending, 0 },
+    { "COLLECTION REFUSED",  "Send a Cobrador bounty hunter packing.",     ft_cob1, 0 },
+    { "LUCKY'S COIN",        "Break Los Cobradores for good.",             ft_cob4, 0 },
     { "THE DOG JUDGES YOU", "Send Poncho to distract guards 5 times.",    ft_s_distract, 1 },
     { "WHO'S A GOOD MENACE","Be a Menace whose dog still adores them.",   ft_s_menacedog, 1 },
 };

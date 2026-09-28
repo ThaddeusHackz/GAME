@@ -1,6 +1,9 @@
 # Changelog
 
 
+## M13 — Los Cobradores
+- Infamy-triggered bounty squad (Rastra, Vidente, Pulpo, Lucky); wound/return with scars, 3rd defeat final + Herald obituary; squad trinket; 2 feats; smoke suite 12.
+
 ## M12 — Feats
 - 24 feats to earn, 2 of them secret. Each one stamps a wax seal and gives +50 XP. Press **J** to see the poster wall. Stamps are saved with your game.
 

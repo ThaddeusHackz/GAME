@@ -16,7 +16,9 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 enum { HT_EDITION = 0, HT_OUTPOST_QUIET, HT_OUTPOST_LOUD, HT_MAST, HT_ALARM, HT_WANTED,
-       HT_MANHUNT, HT_MISSION, HT_BODYCOUNT, HT_PONCHO, HT_JOB, HT_FERRY, HT_ENDING, HT_N };
+       HT_MANHUNT, HT_MISSION, HT_BODYCOUNT, HT_PONCHO, HT_JOB, HT_FERRY, HT_ENDING, HT_OBIT, HT_SQUAD, HT_N };
+static const char *k_cob_names[COB_N] = { "RASTRA", "VIDENTE", "PULPO", "LUCKY" };
+const char *game_cob_name(int who) { return (who >= 0 && who < COB_N) ? k_cob_names[who] : ""; }
 
 /* [template][tone 0 renegade / 1 neutral / 2 hero][variant] ; '#' = value */
 static const char *k_hd_head[HT_N][3][2] = {
@@ -59,6 +61,12 @@ static const char *k_hd_head[HT_N][3][2] = {
  { { "THE MENACE WALKS AWAY", "CITY EXHALES AS CHAOS ENDS" },
    { "IT IS OVER", "THE LAST PAGE TURNS" },
    { "A HORIZON UNDIVIDED", "HERO'S WORK IS DONE" } },
+ { { "@ PUT DOWN LIKE A DOG", "BOUNTY HUNTER @ FOUND DEAD" },
+   { "OBITUARY: @, HUNTER", "@ WILL HUNT NO MORE" },
+   { "@ FALLS: HUNTER HUNTED", "THE STREETS BREATHE: @ IS GONE" } },
+ { { "COBRADORES WIPED OUT", "WHO HUNTS THE HUNTER? THIS ONE." },
+   { "LOS COBRADORES DISBANDED", "ALL # HUNTERS FALLEN" },
+   { "BOUNTY SQUAD BROKEN", "# HUNTERS, ONE STRANGER" } },
 };
 static const char *k_hd_sub[3] = {
     "Residents lock doors as the drifter's legend darkens.",
@@ -113,6 +121,7 @@ static void hd_fill(char *out, int cap, const char *src, int val) {
     int o = 0;
     for (const char *c = src; *c && o < cap - 12; c++) {
         if (*c == '#') o += snprintf(out + o, (size_t)(cap - o), "%d", val);
+        else if (*c == '@') o += snprintf(out + o, (size_t)(cap - o), "%s", game_cob_name(val));
         else out[o++] = *c;
     }
     out[o] = 0;
