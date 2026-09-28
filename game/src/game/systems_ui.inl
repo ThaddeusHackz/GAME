@@ -233,6 +233,7 @@ static void draw_shop_screen(Game *g) {
 }
 
 static void herald_draw_screen(Game *g);   /* herald.inl */
+static void feats_draw_screen(Game *g);    /* feats.inl */
 static void sys_draw_screen(Game *g) {
     switch (g->ui) {
     case UI_MAP:  draw_map_screen(g); break;
@@ -240,6 +241,7 @@ static void sys_draw_screen(Game *g) {
     case UI_SHOP: draw_shop_screen(g); break;
     case UI_CARD: story_draw_card(g); break;
     case UI_HERALD: herald_draw_screen(g); break;
+    case UI_FEATS: feats_draw_screen(g); break;
     default: break;
     }
 }

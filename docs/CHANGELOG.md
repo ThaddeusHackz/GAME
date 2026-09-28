@@ -1,6 +1,9 @@
 # Changelog
 
 
+## M12 — Feats
+- 24 feats to earn, 2 of them secret. Each one stamps a wax seal and gives +50 XP. Press **J** to see the poster wall. Stamps are saved with your game.
+
 ## M11 — Legend
 - Stature: a hidden slider from renegade to hero, moved by what you do (quiet captures, towers, missions and freeing Poncho push it up; kills, alarms and wanted stars push it down).
 - The Herald: notable deeds print a front page (13 story types x 3 tones). An EXTRA! banner pops up; press **N** to read the scrapbook (up to 24 pages, saved with your game).

@@ -49,4 +49,5 @@ no telemetry and no DRM. Everything runs offline.
 - **O** heel / stay / hunt. **Aim + O**: send him to distract a guard.
 - If he is knocked down, hold **E** beside him for 3 s (or wait 30 s).
 - **N** the Herald: read the front pages your deeds have made (LEFT/RIGHT turn pages).
+- **J** feats poster wall: 24 feats (2 secret) stamped as you play; arrows browse.
 - **P** photo mode: WASD/mouse fly, Space/Ctrl up/down, 1/2 zoom, R filter, V time, E capture, P exit. Photos go to your user folder under `photos/`.

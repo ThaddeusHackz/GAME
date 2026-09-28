@@ -103,6 +103,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 if (wp == 'E')      w->edge |= BTN_USE;
                 if (wp == 'P')      w->edge |= BTN_PHOTO;
                 if (wp == 'N')      w->edge |= BTN_HERALD;
+                if (wp == 'J')      w->edge |= BTN_FEATS;
                 if (wp == '1')      w->edge |= BTN_SLOT1;
                 if (wp == '2')      w->edge |= BTN_SLOT2;
                 if (wp == '3')      w->edge |= BTN_SLOT3;

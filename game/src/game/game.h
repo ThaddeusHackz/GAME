@@ -27,7 +27,15 @@
 #define GAME_MAX_PROPS 640
 
 typedef enum { GM_MENU = 0, GM_PLAY, GM_PAUSE, GM_PHOTO } GameMode;
-typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP, UI_CARD, UI_HERALD } GameUi;
+typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP, UI_CARD, UI_HERALD, UI_FEATS } GameUi;
+
+/* M12: Feats poster wall (Spec 53) */
+typedef struct {
+    uint32_t got;                 /* bitmask of stamped feats */
+    float    stamp_t;             /* toast animation timer */
+    int      last, check_acc_i, peak_stars, primed;
+    float    check_acc;
+} Feats;
 
 /* M11: Stature (hidden hero/renegade slider, Spec 26.4) + the Herald (Spec 27) */
 #define HERALD_MAX 24
@@ -268,6 +276,7 @@ typedef struct Game {
     int          ph_filter, ph_shots, ph_capture;
     char         ph_last[200];
     Legend       leg;                     /* M11 */
+    Feats        feats;                   /* M12 */
 } Game;
 
 int   game_init(Game *g, int w, int h, int backend, uint32_t seed);
@@ -310,7 +319,13 @@ int   game_stature_tier(const Game *g);        /* -2 renegade .. +2 hero */
 const char *game_stature_name(const Game *g);
 void  game_stature_add(Game *g, float d);
 int   game_herald_headline(const Game *g, int page, char *out, int cap);
-int   game_herald_print(Game *g, int tmpl, int val);   /* returns page index */                                 /* submit + draw */
+int   game_herald_print(Game *g, int tmpl, int val);   /* returns page index */
+/* M12 feats */
+int   game_feat_count(void);
+int   game_feats_stamped(const Game *g);
+const char *game_feat_name(int i);
+int   game_feat_secret(int i);
+int   game_feat_unlock(Game *g, int i);           /* 1 if newly stamped */                                 /* submit + draw */
 void  game_message(Game *g, const char *fmt, ...);
 /* M4: act-II world swap (Spec 4.3 — one streaming world per act). Frees the
    island world and rebuilds Meridian City on the same heightfield footprint. */

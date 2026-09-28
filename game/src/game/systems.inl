@@ -320,6 +320,7 @@ int game_save(Game *g, int slot, int is_auto) {
     story_save(g, &s);
     poncho_save(g, &s);
     legend_save(g, &s);
+    save_set_flag(&s, "feats", (int)g->feats.got);
     save_set_flag(&s, "xp_total", pr->xp_total);
     for (int i = 0; i < FT_N; i++) {
         char k[16]; snprintf(k, sizeof k, "ft_%d", i);
@@ -392,6 +393,7 @@ int game_load(Game *g, int slot, int is_auto) {
     story_load(g, &s);
     poncho_load(g, &s);
     legend_load(g, &s);
+    g->feats.got = (uint32_t)save_get_flag(&s, "feats", 0); g->feats.primed = 0;
     g->mode = GM_PLAY;
     g->ui = UI_NONE;
     save_add_stat_ll(&s.stats.saves_loaded, 1);

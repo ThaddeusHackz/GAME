@@ -28,6 +28,9 @@ static void  photo_draw_hint(struct Game *g);
 static void  photo_capture(struct Game *g);
 static void  legend_frame(struct Game *g, float dt);
 static void  herald_draw_banner(struct Game *g);
+static void  feats_frame(struct Game *g, float dt);
+static void  feats_input(struct Game *g, const PlatInput *in);
+static void  feats_draw_toast(struct Game *g);
 static void  herald_input(struct Game *g, const PlatInput *in);
 
 /* ── world constants ───────────────────────────────────────────────────── */
@@ -2139,8 +2142,10 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
 
     /* ── M5 modal screens pause the simulation (map / character / shop) ── */
     if (g->ui == UI_HERALD) { herald_input(g, in); return; }
+    if (g->ui == UI_FEATS) { feats_input(g, in); return; }
     if (g->ui != UI_NONE) { sys_ui_input(g, in); return; }
     if (in->pressed & BTN_HERALD) { g->ui = UI_HERALD; g->leg.view = g->leg.n - 1; return; }
+    if (in->pressed & BTN_FEATS) { g->ui = UI_FEATS; g->ui_sel = 0; return; }
     if (in->pressed & BTN_MAP)  { g->ui = UI_MAP;  g->ui_sel = 0; return; }
     if (in->pressed & BTN_CHAR) { g->ui = UI_CHAR; g->ui_sel = 0; g->ui_tab = 0; return; }
     if (in->pressed & BTN_DEBUG) g->show_debug = !g->show_debug;
@@ -2252,6 +2257,7 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     /* ── M4: Meridian City lives when act II is loaded ── */
     if (g->act == 1) city_frame(&g->city, g, in, dt);
     legend_frame(g, dt);                     /* M11 stature + Herald */
+    feats_frame(g, dt);                      /* M12 feats */
 
     /* ── photo mode / debug toggles ── */
     if ((in->pressed & BTN_PHOTO) && game_photo_enter(g)) {
@@ -2480,6 +2486,7 @@ static void draw_minimap(Game *g) {
 #include "poncho.inl"       /* M9 companion */
 #include "photo.inl"        /* M9 photo mode */
 #include "herald.inl"       /* M11 stature + the Herald */
+#include "feats.inl"        /* M12 feats poster */
 
 static void draw_hud(Game *g) {
     Settings *s = settings();
@@ -2831,6 +2838,7 @@ void game_render(Game *g) {
             draw_hud(g);
             poncho_draw_hud(g);
             herald_draw_banner(g);
+            feats_draw_toast(g);
             if (g->ui != UI_NONE) sys_draw_screen(g);
             const Player *pp = &g->player;
             if (pp->stance != PL_ST_ZIP && pp->zips) {
