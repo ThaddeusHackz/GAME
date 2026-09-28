@@ -1,6 +1,11 @@
 # Changelog
 
 
+## M15 — Boss B2 El Reloj
+- El Reloj boss fight: 4 bomb columns to defuse, a sweeping clock hand, 3 phases.
+- New feat SINCRONIZADO (28 feats). New suite smoke_reloj; 917 checks total.
+- Known gap: the clock hand is not drawn in the world (HUD only).
+
 ## M13 — Los Cobradores
 - Infamy-triggered bounty squad (Rastra, Vidente, Pulpo, Lucky); wound/return with scars, 3rd defeat final + Herald obituary; squad trinket; 2 feats; smoke suite 12.
 

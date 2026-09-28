@@ -155,6 +155,10 @@ build_test() {
   compile_host "$exe13" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
       "$GAME/tests/smoke_boss.c" || { echo "compile FAILED"; return 1; }
   run_smoke "$exe13" || rc=1
+  local exe14="$BUILD/dh_smoke_reloj"
+  compile_host "$exe14" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/tests/smoke_reloj.c" || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe14" || rc=1
   return $rc
 }
 

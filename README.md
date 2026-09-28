@@ -29,6 +29,8 @@ dependencies).
 | M11 | Stature (hidden hero/renegade slider, 5 reactions) + the Herald front pages & scrapbook (N) | 795/795 | [report](docs/reports/M11_report.md) |
 | M12 | Feats poster wall: 24 feats (2 secret), wax-seal stamps, +50 XP, saved (J) | 818/818 | [report](docs/reports/M12_report.md) |
 | M13 | Los Cobradores: 4 named bounty hunters, Infamy trigger, scars, obituaries, trinket | 889/889 | [report](docs/reports/M13_report.md) |
+| M14 | Boss B1 La Sargento: cadence shield wall, 3 phases | 889/889 | [report](docs/reports/M14_report.md) |
+| M15 | Boss B2 El Reloj: bomb columns, clock-hand sweep, 3 phases | 917/917 | [report](docs/reports/M15_report.md) |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

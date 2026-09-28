@@ -43,6 +43,8 @@ typedef struct {
     int   active, who, phase, clean, slot, drum[2], shield[4], flank[2];
     float t, beat_t, stagger_t, whistle_t, stun_t, bark_cd, prompt_t;
     int   beat_i, beaten;            /* beaten: bitmask of bosses defeated */
+    float bomb_t, hand_ang, hand_spd, expose_t;   /* B2 El Reloj */
+    int   bomb_live, dets, cycle, prompt_who;
     int   fights, losses, clean_mask; /* clean_mask: beaten above half health */
 } Bosses;
 
@@ -346,6 +348,9 @@ int   game_boss_phase(const Game *g);           /* 1..3, 0 idle */
 int   game_boss_shielded(const Game *g);        /* shield wall up (cadence) */
 const char *game_boss_name(int who);
 Vec3  game_boss_drum_pos(const Game *g);        /* world war-drum that starts B1 */
+Vec3  game_boss_clock_pos(const Game *g);
+float game_boss_hand_dist(const Game *g, Vec3 p);       /* clock dial that starts B2 */
+Vec3  game_boss_bomb_pos(const Game *g, int k); /* B2 bomb column k (0..3) */
 /* M13 bounty squad */
 int   game_cob_spawn(Game *g, int who);
 int   game_cob_fallen(const Game *g);
