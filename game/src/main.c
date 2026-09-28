@@ -16,6 +16,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 #include "game/game.h"
 #include "plat/plat.h"
+#include "audio/audio.h"
 #include "core/dh_log.h"
 #include "core/settings.h"
 
@@ -167,6 +168,8 @@ int main(int argc, char **argv) {
     if (o.night) game_set_time(&game, 0.78f);            /* ~00:43 — moonlit */
     if (o.city) { game_start_play(&game); game_load_city(&game); }   /* M4 act II */
 
+    plat_audio_set_null(o.headless);
+
     /* ── main loop ── */
     PlatInput in;
     uint64_t t_prev = plat_now_us();
@@ -178,6 +181,7 @@ int main(int argc, char **argv) {
         uint64_t t0 = plat_now_us();
 
         game_frame(&game, &in, DH_TICK_DT);
+        plat_audio_pump();                   /* M7: feed the mixer stream */
 
         uint64_t t1 = plat_now_us();
         game_render(&game);
@@ -210,6 +214,10 @@ int main(int argc, char **argv) {
         }
         t_prev = plat_now_us();
     }
+
+    plat_audio_close();
+    DH_INFO("main", "audio: %llu sfx plays, music intensity %.2f",
+            (unsigned long long)audio_plays_total(), audio_intensity());
 
     /* ── summary (also the CI assertion surface) ── */
     Player *p = &game.player;

@@ -233,3 +233,18 @@ Plat *plat_headless_create(int w, int h, const char *script_path,
 void plat_destroy(Plat *p) {
     if (p && p->destroy) p->destroy(p);
 }
+
+/* ── M7: null audio device — the mixer still runs so tests can observe it ── */
+#include "../audio/audio.h"
+int plat_audio_null_pump(void) {
+    static int16_t buf[AUDIO_RATE / 60 + 1];
+    int n = AUDIO_RATE / 60, pk = 0;
+    audio_mix(buf, n);
+    for (int i = 0; i < n; i++) { int a = buf[i] < 0 ? -buf[i] : buf[i]; if (a > pk) pk = a; }
+    return pk;
+}
+#ifndef _WIN32
+int  plat_audio_pump(void) { return plat_audio_null_pump(); }
+void plat_audio_close(void) {}
+void plat_audio_set_null(int on) { (void)on; }
+#endif

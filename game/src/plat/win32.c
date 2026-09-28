@@ -288,3 +288,52 @@ Plat *plat_win32_create(int w, int h, const char *title) {
 }
 
 #endif /* _WIN32 */
+
+/* ── M7: waveOut stream (winmm, already linked). 6 × 1024-sample buffers
+   ≈ 280 ms of queue at 22.05 kHz; any finished buffer is refilled from the
+   mixer each frame. If the device fails to open we log it and stay silent —
+   the game never depends on audio (Honesty Contract / P5). ── */
+#include <mmsystem.h>
+#include "../audio/audio.h"
+#define AQ_N 6
+#define AQ_LEN 1024
+static HWAVEOUT g_wo; static int g_wo_state;     /* 0 untried, 1 ok, -1 failed */
+static WAVEHDR g_wh[AQ_N]; static int16_t g_wbuf[AQ_N][AQ_LEN];
+static int g_audio_null;
+void plat_audio_set_null(int on) { g_audio_null = on; }
+int plat_audio_pump(void) {
+    if (g_audio_null) return plat_audio_null_pump();
+    if (g_wo_state == 0) {
+        WAVEFORMATEX f; memset(&f, 0, sizeof f);
+        f.wFormatTag = WAVE_FORMAT_PCM; f.nChannels = 1; f.nSamplesPerSec = AUDIO_RATE;
+        f.wBitsPerSample = 16; f.nBlockAlign = 2; f.nAvgBytesPerSec = AUDIO_RATE * 2;
+        if (waveOutOpen(&g_wo, WAVE_MAPPER, &f, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
+            g_wo_state = -1; DH_WARN("audio", "waveOut unavailable — running silent");
+            return 0;
+        }
+        g_wo_state = 1;
+        for (int i = 0; i < AQ_N; i++) {
+            memset(&g_wh[i], 0, sizeof g_wh[i]);
+            g_wh[i].lpData = (LPSTR)g_wbuf[i]; g_wh[i].dwBufferLength = AQ_LEN * 2;
+            waveOutPrepareHeader(g_wo, &g_wh[i], sizeof(WAVEHDR));
+            audio_mix(g_wbuf[i], AQ_LEN);
+            waveOutWrite(g_wo, &g_wh[i], sizeof(WAVEHDR));
+        }
+        DH_INFO("audio", "waveOut open: %d Hz mono, %d x %d buffers", AUDIO_RATE, AQ_N, AQ_LEN);
+    }
+    if (g_wo_state != 1) return 0;
+    int pk = 0;
+    for (int i = 0; i < AQ_N; i++) if (g_wh[i].dwFlags & WHDR_DONE) {
+        audio_mix(g_wbuf[i], AQ_LEN);
+        for (int k = 0; k < AQ_LEN; k += 8) { int a = abs(g_wbuf[i][k]); if (a > pk) pk = a; }
+        g_wh[i].dwFlags &= ~WHDR_DONE;
+        waveOutWrite(g_wo, &g_wh[i], sizeof(WAVEHDR));
+    }
+    return pk;
+}
+void plat_audio_close(void) {
+    if (g_wo_state != 1) return;
+    waveOutReset(g_wo);
+    for (int i = 0; i < AQ_N; i++) waveOutUnprepareHeader(g_wo, &g_wh[i], sizeof(WAVEHDR));
+    waveOutClose(g_wo); g_wo_state = 0;
+}

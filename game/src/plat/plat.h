@@ -78,6 +78,14 @@ Plat *plat_headless_create(int w, int h, const char *script_path,
 Plat *plat_win32_create(int w, int h, const char *title);   /* M1b */
 
 void  plat_destroy(Plat *p);
+
+/* M7 audio stream: call once per frame; keeps the device fed from
+   audio_mix(). Win32 = waveOut ring; headless = mixes a frame's worth into
+   scratch (deterministic, lets tests measure output). Returns peak |sample|. */
+int   plat_audio_pump(void);
+void  plat_audio_close(void);
+int   plat_audio_null_pump(void);      /* mixes to scratch, no device */
+void  plat_audio_set_null(int on);     /* --headless on Windows: no device */
 /* Frames captured so far by the headless platform (0 for windowed). */
 int   plat_headless_shots_taken(void);
 

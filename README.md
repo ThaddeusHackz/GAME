@@ -23,6 +23,7 @@ dependencies).
 | **M5 — Systems & Progression** | ✅ XP/levels (100+50(n-1)), 24 skills in 4 trees wired to live systems, 2 data-driven vendors (economy.json), hunting/skinning, herbs, 4 crafting recipes, medkits/armor, island alert level, safehouses (rest+autosave), map screen + fast travel, saves/continue incl. wanted stars, island state persists across the ferry, 93-check systems smoke |
 | M5–M13 | not started |
 | M6 | Story: 11 data-driven missions, text cards, choices + 2 endings, tracker/waypoints, checkpoints | done (81 checks) |
+| M7 | Polish: procedural audio (20 synth SFX + adaptive score, waveOut), difficulty + photosensitivity/shake settings live, bird flocks | done (23 checks) |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

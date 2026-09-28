@@ -2,6 +2,7 @@
    DIVIDED HORIZON — game application layer (M1: Traversal)
    ══════════════════════════════════════════════════════════════════════════ */
 #include "game.h"
+#include "../audio/audio.h"
 #include "../core/save.h"
 #include "../core/dh_log.h"
 
@@ -10,6 +11,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+/* M7 polish (polish.inl) — used by combat before the include point */
+static float pol_diff_damage(void);
+static float pol_diff_aim(void);
+static void  pol_flocks_draw(struct Game *g);
+static void  pol_apply_camera(struct Game *g);
 
 /* ── world constants ───────────────────────────────────────────────────── */
 #define WORLD_SIZE      1000.0f   /* metres per side */
@@ -1503,8 +1510,8 @@ static void combat_update(Game *g, const PlatInput *in, float dt)
                                              rng_range(&g->rng, -0.4f, 0.4f))),
                    0xFF3030F0u);
         fx_spawn(g, muz, v3_mul(v3_sub(pv.eye, muz), 0.05f), 3, 0xFF40A0FFu, 2.f, 0.06f, 0);
-        if (rng_f(&g->rng) < e->shot_acc) {
-            float dmg = enemy_shot_damage(e->arch);
+        if (rng_f(&g->rng) < e->shot_acc * pol_diff_aim()) {
+            float dmg = enemy_shot_damage(e->arch) * pol_diff_damage();   /* M7 difficulty */
             if (g->armor > 0.f) {                    /* M5 plate absorbs 60% */
                 float ab = dh_minf(g->armor, dmg * 0.6f);
                 g->armor -= ab; dmg -= ab;
@@ -1610,6 +1617,7 @@ static void draw_tracers_fx(Game *g)
         rend_lines(pts, 1, tr->color, 1.6f);
     }
     if (g->fx_count > 0) rend_particles(g->fx, g->fx_count, -1, 1.f);
+    pol_flocks_draw(g);                      /* M7 ambient birds */
 }
 
 /* ── island rendering (M3) ───────────────────────────────────────────────── */
@@ -2047,6 +2055,7 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     DH_INFO("game", "M1 world ready: %d chunks, %d obstacles, %d textures, backend %s",
             chunks, g->obs.count, tex_count(), rend_backend_name());
     game_message(g, "TRAVERSAL COURSE - run south");
+    if (!audio_init()) DH_WARN("audio", "SFX bank synthesis failed - running silent");
     return 1;
 }
 
@@ -2074,8 +2083,15 @@ void game_free(Game *g) {
 
 #include "systems.inl"   /* M5 systems & progression glue */
 #include "story.inl"     /* M6 story missions glue */
+#include "polish.inl"    /* M7 audio cues / flocks / camera FX / difficulty */
 
+static void game_frame_inner(Game *g, const PlatInput *in, float dt);
 void game_frame(Game *g, const PlatInput *in, float dt) {
+    if (!g || !g->ready || !in) return;
+    game_frame_inner(g, in, dt);
+    pol_frame(g, dt);                        /* M7: cues after the sim settles */
+}
+static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     if (!g || !g->ready || !in) return;
     g->time += dt;
     g->frame_index++;
@@ -2515,14 +2531,17 @@ static void draw_hud(Game *g) {
     /* ── M2: combat HUD ── */
     /* damage vignette */
     if (g->damage_flash > 0.0f) {
-        uint32_t a = (uint32_t)(dh_clampf(g->damage_flash, 0.0f, 1.0f) * 80.0f) << 24;
+        /* photosensitivity: capped, dimmer edge instead of a bright pulse */
+        float fa = s->photosensitivity ? dh_minf(g->damage_flash, 0.4f) * 60.0f
+                                       : dh_clampf(g->damage_flash, 0.0f, 1.0f) * 80.0f;
+        uint32_t a = (uint32_t)fa << 24;
         rend_quad2d(0, 0, W, H * 0.10f, -1, 0,0,1,1, a | 0x001818A0u);
         rend_quad2d(0, H * 0.90f, W, H * 0.10f, -1, 0,0,1,1, a | 0x001818A0u);
         rend_quad2d(0, 0, W * 0.07f, H, -1, 0,0,1,1, a | 0x001818A0u);
         rend_quad2d(W * 0.93f, 0, W * 0.07f, H, -1, 0,0,1,1, a | 0x001818A0u);
     }
     /* hitmarker: 45° ticks around the crosshair; red X on a kill */
-    if (g->hitmark_t > 0.0f && s->crosshair_on) {
+    if (g->hitmark_t > 0.0f && s->crosshair_on && s->hit_marker) {
         float cx = W * 0.5f, cy = H * 0.5f, o = 6.0f * ui, L = 5.0f * ui, t2 = 2.0f * ui;
         uint32_t hc = g->hitmark_kill ? C_RED : C_WHITE;
         rend_quad2d(cx - o - L, cy - o - t2*0.5f, L, t2, -1, 0,0,1,1, hc);
@@ -2759,6 +2778,7 @@ void game_render(Game *g) {
         g->cam_dir = v3_norm(v3_add(v3_mul(d1, cosf(g->rec_pitch)),
                                     v3_mul(cup, sinf(g->rec_pitch))));
     }
+    pol_apply_camera(g);                     /* M7 shake (settings-gated) */
     Vec3 target = v3_add(g->cam_pos, g->cam_dir);
     g->view = m4_look_at(g->cam_pos, target, v3(0, 1, 0));
     float aspect = (float)g->w / (float)(g->h > 0 ? g->h : 1);

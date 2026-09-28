@@ -59,6 +59,7 @@ GAME_SRC=(
   "$GAME/src/city/city.c"
   "$GAME/src/meta/progress.c"
   "$GAME/src/meta/mission.c"
+  "$GAME/src/audio/audio.c"
   "$GAME/src/game/game.c"
 )
 PLAT_SRC_LINUX=(
@@ -128,6 +129,10 @@ build_test() {
   compile_host "$exe7" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
       "$GAME/tests/smoke_missions.c" || { echo "compile FAILED"; return 1; }
   run_smoke "$exe7" || rc=1
+  local exe8="$BUILD/dh_smoke_polish"
+  compile_host "$exe8" "${CORE_SRC[@]}" "${GAME_SRC[@]}" "${PLAT_SRC_LINUX[@]}" \
+      "$GAME/tests/smoke_polish.c" || { echo "compile FAILED"; return 1; }
+  run_smoke "$exe8" || rc=1
   return $rc
 }
 

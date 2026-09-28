@@ -113,6 +113,27 @@ typedef struct {
 } Tracer;
 typedef struct { Tracer v[TRACER_MAX]; int count; } TracerSet;
 
+/* ── M7 polish: audio cue edge-detection + ambient birds + camera FX ── */
+#define BIRD_FLOCKS 3
+#define BIRDS_PER   9
+typedef struct {
+    Vec3  home;          /* orbit centre (world) */
+    Vec3  off;           /* current flock offset from home (scatter) */
+    Vec3  vel;
+    float radius, phase, speed, scatter_t;
+} Flock;
+typedef struct {
+    int   inited;
+    int   prev_slot, prev_mag, prev_reload, prev_jumps, prev_land;
+    int   prev_card, prev_done, prev_alarm, prev_stars, prev_ui, prev_mode;
+    float prev_hit, prev_dmg, step_dist, siren_t, bird_t;
+    float shake;         /* camera shake amplitude (m), decays */
+    int   cues;          /* total cues fired (tests) */
+    float intensity;     /* last music intensity target */
+    Flock flock[BIRD_FLOCKS];
+    int   scatters;      /* times a flock was spooked (tests) */
+} Polish;
+
 typedef struct Game {
     /* ── world ── */
     Terrain      terrain;
@@ -224,6 +245,7 @@ typedef struct Game {
     uint32_t     seed;
     int          ready;
     int          quit;
+    Polish       pol;                     /* M7 */
 } Game;
 
 int   game_init(Game *g, int w, int h, int backend, uint32_t seed);
@@ -232,6 +254,7 @@ void  game_start_play(Game *g);
 /* M2 combat-arena test/spawn API: teleport the player to the arena, grant the
    starting loadout, and populate `n` hostiles. Used by smoke_combat + demo. */
 void  game_arena_start(Game *g, int n_enemies);
+float pol_diff_damage_pub(void);          /* M7: difficulty damage multiplier */
 
 /* M3 island-slice API. outpost_start teleports the player to the beach south
    of the outpost, grants the loadout, and seeds the garrison — the DoD path
