@@ -1,5 +1,8 @@
 # Changelog
 
+
+## M10 — Performance
+- 2D HUD/menu quads batched per texture run: max draw calls 1188 → 193 in the benchmark (Spec 15 budget < 900 at Low).
 ## M9 — Soul
 - Poncho the dog: free him on the beach (E), O = heel/stay/hunt, aim+O = distract a guard, pet to bond, never dies (hold E 3 s or auto 30 s).
 - Photo mode (P): frozen world, free camera, 6 filters, time of day, PNG capture to user dir/photos.

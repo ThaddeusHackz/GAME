@@ -514,7 +514,6 @@ static void draw_quad2d(const RenderItem *it) {
             if (a >= 0.995f) put_opaque(x, y, col); else put_blend(x, y, col, a);
         }
     }
-    rend()->draw_calls++;
 }
 
 /* ── command-list dispatch ─────────────────────────────────────────────── */
@@ -531,7 +530,12 @@ static void draw_all_items(void) {
         switch (it->kind) {
             case RI_MESH:      draw_mesh_item(it);       break;
             case RI_LINES:     draw_lines_item(it);      break;
-            case RI_QUAD2D:    draw_quad2d(it);          break;
+            case RI_QUAD2D: {   /* one "call" per texture/scissor run (matches GL batching) */
+                int e = rend_quad2d_run_end(items, i, n);
+                for (int k = i; k < e; k++) draw_quad2d(&items[k]);
+                st->draw_calls++;
+                i = e - 1;
+                break; }
             case RI_PARTICLES: draw_particles_item(it);  break;
         }
     }

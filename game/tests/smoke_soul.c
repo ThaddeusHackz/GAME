@@ -210,6 +210,22 @@ int main(int argc, char **argv) {
     game_render(&g);
     CHECK(rend()->draw_calls > 0, "renders normally after photo mode");
 
+    /* M10 draw-call budget (Spec 15: < 900 at Low) */
+    {
+        RenderItem q[5]; memset(q, 0, sizeof q);
+        for (int i = 0; i < 5; i++) { q[i].kind = RI_QUAD2D; q[i].tex = 1; }
+        q[3].tex = 2;
+        CHECK(rend_quad2d_run_end(q, 0, 5) == 3, "2D run stops at texture change");
+        CHECK(rend_quad2d_run_end(q, 3, 5) == 4, "single-quad run");
+        q[4].scissor[2] = 10.f;
+        CHECK(rend_quad2d_run_end(q, 4, 5) == 5, "run end clamps to n");
+        settings_apply_preset(settings(), QUALITY_LOW);
+        int worst = 0;
+        for (int k = 0; k < 10; k++) { run(&g, 0, 0, 0.f, 1); game_render(&g);
+            if (rend()->draw_calls > worst) worst = rend()->draw_calls; }
+        CHECK(worst > 0 && worst < 900, "Low preset under 900 draw calls (%d)", worst);
+    }
+
     DH_INFO("smoke9", "──── %d checks, %d failed ────", g_checks, g_failed);
     printf("M9 SOUL SMOKE %s: %d/%d checks\n", g_failed ? "FAILED" : "PASSED", g_checks - g_failed, g_checks);
     game_free(&g);

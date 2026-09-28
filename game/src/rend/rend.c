@@ -597,3 +597,12 @@ int rend_save_png(const char *path) {
     DH_INFO("rend", "png → %s (%dx%d, %.0f KB)", path, w, h, (raw+zl)/1024.0f);
     return 1;
 }
+
+int rend_quad2d_run_end(const RenderItem *items, int i, int n) {
+    const RenderItem *a = &items[i];
+    int j = i + 1;
+    while (j < n && items[j].kind == RI_QUAD2D && items[j].tex == a->tex &&
+           items[j].scissor[0] == a->scissor[0] && items[j].scissor[1] == a->scissor[1] &&
+           items[j].scissor[2] == a->scissor[2] && items[j].scissor[3] == a->scissor[3]) j++;
+    return j;
+}

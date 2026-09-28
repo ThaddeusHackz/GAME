@@ -261,50 +261,50 @@ static void draw_lines_item(const RenderItem *it) {
     rs->tris_drawn += it->line_count * 2;
 }
 
-static void draw_quad2d(const RenderItem *it) {
+/* M10: a run of 2D quads sharing texture + scissor is one glBegin/glEnd
+   (per-vertex colour), so a HUD line of 40 glyphs is 1 submit, not 40. */
+static void draw_quad2d_run(const RenderItem *items, int i0, int i1) {
+    const RenderItem *it = &items[i0];
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
-    /* origin top-left, +y down — matches rend_quad2d's contract */
     glOrtho(0.0, (GLdouble)s_w, (GLdouble)s_h, 0.0, -1.0, 1.0);
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glLoadIdentity();
-
     glDisable(GL_LIGHTING);
     glDisable(GL_FOG);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
-    float r, g, b, a; col_f(it->color, &r, &g, &b, &a);
-    a *= it->alpha;
-    if (a < 0.999f) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); }
-    else glDisable(GL_BLEND);
-
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     if (it->scissor[2] > 0.0f && it->scissor[3] > 0.0f) {
         glEnable(GL_SCISSOR_TEST);
         glScissor((int)it->scissor[0], (int)(s_h - it->scissor[1] - it->scissor[3]),
                   (int)it->scissor[2], (int)it->scissor[3]);
     } else glDisable(GL_SCISSOR_TEST);
-
     bind_tex(it->tex);
-    glColor4f(r, g, b, a);
     glBegin(GL_QUADS);
-    glTexCoord2f(it->u0, it->v0); glVertex2f(it->sx,          it->sy);
-    glTexCoord2f(it->u1, it->v0); glVertex2f(it->sx + it->sw, it->sy);
-    glTexCoord2f(it->u1, it->v1); glVertex2f(it->sx + it->sw, it->sy + it->sh);
-    glTexCoord2f(it->u0, it->v1); glVertex2f(it->sx,          it->sy + it->sh);
+    for (int k = i0; k < i1; k++) {
+        const RenderItem *q = &items[k];
+        float r, g, b, a; col_f(q->color, &r, &g, &b, &a);
+        glColor4f(r, g, b, a * q->alpha);
+        glTexCoord2f(q->u0, q->v0); glVertex2f(q->sx,         q->sy);
+        glTexCoord2f(q->u1, q->v0); glVertex2f(q->sx + q->sw, q->sy);
+        glTexCoord2f(q->u1, q->v1); glVertex2f(q->sx + q->sw, q->sy + q->sh);
+        glTexCoord2f(q->u0, q->v1); glVertex2f(q->sx,         q->sy + q->sh);
+    }
     glEnd();
     glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
-
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
     RendState *rs = rend();
     rs->draw_calls++;
-    rs->tris_drawn += 2;
+    rs->tris_drawn += 2 * (i1 - i0);
 }
 
 static void draw_particles(const RenderItem *it) {
@@ -355,7 +355,8 @@ void rend_be_present(void) {
         switch (items[i].kind) {
         case RI_MESH:      draw_mesh_item(&items[i]); break;
         case RI_LINES:     draw_lines_item(&items[i]); break;
-        case RI_QUAD2D:    draw_quad2d(&items[i]); break;
+        case RI_QUAD2D: { int e = rend_quad2d_run_end(items, i, count);
+                          draw_quad2d_run(items, i, e); i = e - 1; break; }
         case RI_PARTICLES: draw_particles(&items[i]); break;
         }
     }

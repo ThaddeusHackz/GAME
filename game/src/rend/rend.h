@@ -194,6 +194,9 @@ const Mat4 *rend_proj(void);
 const Mat4 *rend_viewproj(void);
 Vec3        rend_cam_pos(void);
 RenderItem *rend_items(int *count);
+/* M10 2D batching: index one past the run of consecutive RI_QUAD2D items
+   starting at `i` that share texture + scissor (one GPU submit per run). */
+int rend_quad2d_run_end(const RenderItem *items, int i, int n);
 int         rend_in_2d(void);
 const float *rend_scissor(void);
 void        rend_colorblind_matrix(int mode, float m[9]);
