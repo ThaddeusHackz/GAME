@@ -232,12 +232,14 @@ static void draw_shop_screen(Game *g) {
     font_text_shadow(x0 + 10.f * ui, y0 + ph - 18.f * ui, fs * 0.7f, "UP/DOWN SELECT   E BUY/SELL   ESC LEAVE", C_GOLD);
 }
 
+static void herald_draw_screen(Game *g);   /* herald.inl */
 static void sys_draw_screen(Game *g) {
     switch (g->ui) {
     case UI_MAP:  draw_map_screen(g); break;
     case UI_CHAR: draw_char_screen(g); break;
     case UI_SHOP: draw_shop_screen(g); break;
     case UI_CARD: story_draw_card(g); break;
+    case UI_HERALD: herald_draw_screen(g); break;
     default: break;
     }
 }

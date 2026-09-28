@@ -44,6 +44,7 @@
 #define BTN_DEBUG   (1u << 26)   /* M5: perf overlay (was TAB; TAB is the map now) */
 #define BTN_CHAR    (1u << 27)   /* M5: character screen (skills / crafting / bag) */
 #define BTN_LOAD    (1u << 28)   /* M5: continue from the latest save (title screen) */
+#define BTN_HERALD  (1u << 30)   /* M11: the Herald scrapbook (N) */
 #define BTN_DOG     (1u << 29)   /* M9: Poncho command (aim + O = distract target) */
 
 typedef struct {

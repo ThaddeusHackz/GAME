@@ -193,7 +193,7 @@ int prog_reinforce_size(const Progress *p) { return 3 + prog_alert_level(p); }
 
 /* ══════════════════════════════ economy ══════════════════════════════ */
 int prog_price(const Progress *p, int base) {
-    float f = (float)base * prog_mod(p, MOD_PRICE);
+    float f = (float)base * prog_mod(p, MOD_PRICE) * (p->price_k > 0.f ? p->price_k : 1.f);
     int v = (int)(f + 0.5f);
     return v < 1 ? 1 : v;
 }

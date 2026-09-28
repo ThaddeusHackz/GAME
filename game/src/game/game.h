@@ -27,7 +27,19 @@
 #define GAME_MAX_PROPS 640
 
 typedef enum { GM_MENU = 0, GM_PLAY, GM_PAUSE, GM_PHOTO } GameMode;
-typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP, UI_CARD } GameUi;
+typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP, UI_CARD, UI_HERALD } GameUi;
+
+/* M11: Stature (hidden hero/renegade slider, Spec 26.4) + the Herald (Spec 27) */
+#define HERALD_MAX 24
+typedef struct { int tmpl, tone, day, val, act; uint32_t seed; } HeraldPage;
+typedef struct {
+    float    stature;                /* -100 renegade .. +100 hero (never shown as a number) */
+    int      primed, day;
+    int      prev_ev[16], prev_stars, prev_done, prev_outpost, prev_dog, prev_ending, prev_act, prev_kills;
+    HeraldPage pages[HERALD_MAX];
+    int      n, view, printed;
+    float    banner_t, bark_cd, day_prev;
+} Legend;
 
 typedef struct {
     Mat4     model;
@@ -255,6 +267,7 @@ typedef struct Game {
     float        ph_yaw, ph_pitch, ph_fov, ph_day0;
     int          ph_filter, ph_shots, ph_capture;
     char         ph_last[200];
+    Legend       leg;                     /* M11 */
 } Game;
 
 int   game_init(Game *g, int w, int h, int backend, uint32_t seed);
@@ -291,7 +304,13 @@ void  game_render(Game *g);
 /* M9 */
 int   game_photo_enter(Game *g);                 /* 1 = now in photo mode */
 int   game_photo_filter_count(void);
-const char *game_photo_filter_name(int i);                                 /* submit + draw */
+const char *game_photo_filter_name(int i);
+/* M11 Stature + Herald */
+int   game_stature_tier(const Game *g);        /* -2 renegade .. +2 hero */
+const char *game_stature_name(const Game *g);
+void  game_stature_add(Game *g, float d);
+int   game_herald_headline(const Game *g, int page, char *out, int cap);
+int   game_herald_print(Game *g, int tmpl, int val);   /* returns page index */                                 /* submit + draw */
 void  game_message(Game *g, const char *fmt, ...);
 /* M4: act-II world swap (Spec 4.3 — one streaming world per act). Frees the
    island world and rebuilds Meridian City on the same heightfield footprint. */

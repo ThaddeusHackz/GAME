@@ -1,6 +1,11 @@
 # Changelog
 
 
+## M11 — Legend
+- Stature: a hidden slider from renegade to hero, moved by what you do (quiet captures, towers, missions and freeing Poncho push it up; kills, alarms and wanted stars push it down).
+- The Herald: notable deeds print a front page (13 story types x 3 tones). An EXTRA! banner pops up; press **N** to read the scrapbook (up to 24 pages, saved with your game).
+- What reacts to stature: shop prices (±5% per tier), how fast heroes shake the cops, what city pedestrians say, the Herald's tone and street poll, and the ending front page.
+
 ## M10 — Performance
 - 2D HUD/menu quads batched per texture run: max draw calls 1188 → 193 in the benchmark (Spec 15 budget < 900 at Low).
 ## M9 — Soul

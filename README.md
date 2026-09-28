@@ -27,6 +27,7 @@ dependencies).
 | M8 | Ship: `--benchmark` (AVG/1%/0.1% lows → benchmark.txt), `--safe-mode`, Spec 17.2 zip layout, player docs. Draw-call budget still exceeded; no HD pack | done (707 checks) |
 | M9 | Soul: Poncho companion (free/heel/stay/hunt/distract, KO+revive, bond) + photo mode (free cam, 6 filters, PNG) | 758/758 | [report](docs/reports/M9_report.md) |
 | M10 | Draw-call budget: batched 2D quads, benchmark peaks 1188 → 193 (Low play ≈ 80, budget 900) | 762/762 | [report](docs/reports/M10_report.md) |
+| M11 | Stature (hidden hero/renegade slider, 5 reactions) + the Herald front pages & scrapbook (N) | 795/795 | [report](docs/reports/M11_report.md) |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

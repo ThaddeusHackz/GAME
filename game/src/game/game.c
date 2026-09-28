@@ -26,6 +26,9 @@ static void  photo_frame(struct Game *g, const PlatInput *in, float dt);
 static void  photo_draw_filter(struct Game *g);
 static void  photo_draw_hint(struct Game *g);
 static void  photo_capture(struct Game *g);
+static void  legend_frame(struct Game *g, float dt);
+static void  herald_draw_banner(struct Game *g);
+static void  herald_input(struct Game *g, const PlatInput *in);
 
 /* ── world constants ───────────────────────────────────────────────────── */
 #define WORLD_SIZE      1000.0f   /* metres per side */
@@ -2135,7 +2138,9 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     if (g->mode == GM_PHOTO) { photo_frame(g, in, dt); return; }   /* M9: sim frozen */
 
     /* ── M5 modal screens pause the simulation (map / character / shop) ── */
+    if (g->ui == UI_HERALD) { herald_input(g, in); return; }
     if (g->ui != UI_NONE) { sys_ui_input(g, in); return; }
+    if (in->pressed & BTN_HERALD) { g->ui = UI_HERALD; g->leg.view = g->leg.n - 1; return; }
     if (in->pressed & BTN_MAP)  { g->ui = UI_MAP;  g->ui_sel = 0; return; }
     if (in->pressed & BTN_CHAR) { g->ui = UI_CHAR; g->ui_sel = 0; g->ui_tab = 0; return; }
     if (in->pressed & BTN_DEBUG) g->show_debug = !g->show_debug;
@@ -2246,6 +2251,7 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
 
     /* ── M4: Meridian City lives when act II is loaded ── */
     if (g->act == 1) city_frame(&g->city, g, in, dt);
+    legend_frame(g, dt);                     /* M11 stature + Herald */
 
     /* ── photo mode / debug toggles ── */
     if ((in->pressed & BTN_PHOTO) && game_photo_enter(g)) {
@@ -2473,6 +2479,7 @@ static void draw_minimap(Game *g) {
 #include "systems_ui.inl"   /* M5 screens + HUD extras */
 #include "poncho.inl"       /* M9 companion */
 #include "photo.inl"        /* M9 photo mode */
+#include "herald.inl"       /* M11 stature + the Herald */
 
 static void draw_hud(Game *g) {
     Settings *s = settings();
@@ -2823,6 +2830,7 @@ void game_render(Game *g) {
         else {
             draw_hud(g);
             poncho_draw_hud(g);
+            herald_draw_banner(g);
             if (g->ui != UI_NONE) sys_draw_screen(g);
             const Player *pp = &g->player;
             if (pp->stance != PL_ST_ZIP && pp->zips) {
