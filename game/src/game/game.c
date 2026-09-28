@@ -17,6 +17,15 @@ static float pol_diff_damage(void);
 static float pol_diff_aim(void);
 static void  pol_flocks_draw(struct Game *g);
 static void  pol_apply_camera(struct Game *g);
+/* M9 (poncho.inl / photo.inl) */
+static void  poncho_init(struct Game *g);
+static void  poncho_frame(struct Game *g, const PlatInput *in, float dt);
+static void  draw_poncho(struct Game *g);
+static void  poncho_draw_hud(struct Game *g);
+static void  photo_frame(struct Game *g, const PlatInput *in, float dt);
+static void  photo_draw_filter(struct Game *g);
+static void  photo_draw_hint(struct Game *g);
+static void  photo_capture(struct Game *g);
 
 /* ── world constants ───────────────────────────────────────────────────── */
 #define WORLD_SIZE      1000.0f   /* metres per side */
@@ -2052,6 +2061,7 @@ int game_init(Game *g, int w, int h, int backend, uint32_t seed) {
     game_apply_settings(g);
     game_apply_skills(g);
     g->ready = 1;
+    poncho_init(g);
     DH_INFO("game", "M1 world ready: %d chunks, %d obstacles, %d textures, backend %s",
             chunks, g->obs.count, tex_count(), rend_backend_name());
     game_message(g, "TRAVERSAL COURSE - run south");
@@ -2122,6 +2132,7 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     }
 
     if (in->pressed & BTN_PAUSE) { g->mode = GM_PAUSE; return; }
+    if (g->mode == GM_PHOTO) { photo_frame(g, in, dt); return; }   /* M9: sim frozen */
 
     /* ── M5 modal screens pause the simulation (map / character / shop) ── */
     if (g->ui != UI_NONE) { sys_ui_input(g, in); return; }
@@ -2231,14 +2242,15 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
 
     /* ── M5: systems tick (heal, safehouse/vendor/skin interact, alert) ── */
     sys_frame(g, in, dt);
+    poncho_frame(g, in, dt);                 /* M9 companion */
 
     /* ── M4: Meridian City lives when act II is loaded ── */
     if (g->act == 1) city_frame(&g->city, g, in, dt);
 
     /* ── photo mode / debug toggles ── */
-    if (in->pressed & BTN_PHOTO) {
-        g->mode = (g->mode == GM_PHOTO) ? GM_PLAY : GM_PHOTO;
-        game_message(g, g->mode == GM_PHOTO ? "PHOTO MODE (HUD off)" : "PHOTO MODE off");
+    if ((in->pressed & BTN_PHOTO) && game_photo_enter(g)) {
+        game_message(g, "PHOTO MODE - WORLD PAUSED");
+        g->message_t = 2.f;
     }
 
     /* M2 dev/DoD hotkey: deploy to the combat arena (30 hostiles) */
@@ -2459,6 +2471,8 @@ static void draw_minimap(Game *g) {
 }
 
 #include "systems_ui.inl"   /* M5 screens + HUD extras */
+#include "poncho.inl"       /* M9 companion */
+#include "photo.inl"        /* M9 photo mode */
 
 static void draw_hud(Game *g) {
     Settings *s = settings();
@@ -2766,7 +2780,10 @@ void game_render(Game *g) {
 
     /* ── camera: first person, eye height eased by the controller ── */
     player_camera(&g->player, &g->cam_pos, &g->cam_dir);
-    if (g->mode == GM_PHOTO) { /* M7 adds free-fly; M1 keeps the player camera */ }
+    if (g->mode == GM_PHOTO) {               /* M9 free camera */
+        g->cam_pos = g->ph_pos;
+        g->cam_dir = v3(sinf(g->ph_yaw) * cosf(g->ph_pitch), sinf(g->ph_pitch), cosf(g->ph_yaw) * cosf(g->ph_pitch));
+    }
     /* recoil view punch: visual-only offset on top of the permanent climb
        that combat already baked into pitch/yaw (decays at 10/s) */
     if (g->rec_pitch != 0.0f || g->rec_yaw != 0.0f) {
@@ -2782,7 +2799,7 @@ void game_render(Game *g) {
     Vec3 target = v3_add(g->cam_pos, g->cam_dir);
     g->view = m4_look_at(g->cam_pos, target, v3(0, 1, 0));
     float aspect = (float)g->w / (float)(g->h > 0 ? g->h : 1);
-    g->proj = m4_perspective(g->cam_fov, aspect, CAM_NEAR, CAM_FAR);
+    g->proj = m4_perspective(g->mode == GM_PHOTO ? g->ph_fov : g->cam_fov, aspect, CAM_NEAR, CAM_FAR);
 
     rend_begin_frame(&g->view, &g->proj, g->cam_pos, &g->light);
     draw_sky(g);
@@ -2794,6 +2811,7 @@ void game_render(Game *g) {
         draw_critters(g);
         draw_outpost_flag(g);
     }
+    draw_poncho(g);
     draw_pickups(g);
     draw_tracers_fx(g);
     draw_zips(g);
@@ -2804,6 +2822,7 @@ void game_render(Game *g) {
         if (g->mode == GM_MENU) draw_menu(g);
         else {
             draw_hud(g);
+            poncho_draw_hud(g);
             if (g->ui != UI_NONE) sys_draw_screen(g);
             const Player *pp = &g->player;
             if (pp->stance != PL_ST_ZIP && pp->zips) {
@@ -2821,8 +2840,13 @@ void game_render(Game *g) {
                              4.0f * settings()->ui_scale, "PAUSED", C_GOLD);
         }
     }
+    if (g->mode == GM_PHOTO) {
+        photo_draw_filter(g);
+        if (!g->ph_capture && g->show_hud) photo_draw_hint(g);
+    }
     rend_pop_2d();
     rend_end_frame();
     rend_apply_post();
+    photo_capture(g);
     rend_present();
 }

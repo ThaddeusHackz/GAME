@@ -1,5 +1,9 @@
 # Changelog
 
+## M9 — Soul
+- Poncho the dog: free him on the beach (E), O = heel/stay/hunt, aim+O = distract a guard, pet to bond, never dies (hold E 3 s or auto 30 s).
+- Photo mode (P): frozen world, free camera, 6 filters, time of day, PNG capture to user dir/photos.
+
 ## M8: Performance / Ship
 - `--benchmark [N]`: runs 3 scenes and writes benchmark.txt with AVG, 1% and 0.1% lows plus a recommended preset.
 - `--safe-mode`: software renderer and Low preset. Also available as SafeMode.bat.

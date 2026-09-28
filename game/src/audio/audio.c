@@ -21,7 +21,7 @@ static uint64_t g_plays;
 static const char *k_names[SFX_N] = {
     "shot_pistol","shot_rifle","shot_shotgun","shot_sniper","reload","dry",
     "step","step_water","hit","kill","hurt","ui_click","card","mission",
-    "alarm","siren","pickup","jump","land","birds" };
+    "alarm","siren","pickup","jump","land","birds","bark","jingle","whine","shutter" };
 
 static float nz(void) {                 /* deterministic white noise -1..1 */
     g_seed ^= g_seed << 13; g_seed ^= g_seed >> 17; g_seed ^= g_seed << 5;
@@ -120,6 +120,27 @@ int audio_init(void) {
             }
         }
     }
+    { /* M9 Poncho bark: two gruff formant pulses (saw + noise, falling pitch) */
+        float *b = alloc_bank(SFX_BARK, 0.42f);
+        if (b) for (int k = 0; k < 2; k++) {
+            int st = (int)(k * 0.2f * AUDIO_RATE); float ph = 0.f;
+            for (int i = st; i < st + (int)(0.13f * AUDIO_RATE) && i < g_bank[SFX_BARK].n; i++) {
+                float t = (float)(i - st) / AUDIO_RATE;
+                ph += (520.f - 1800.f * t) / AUDIO_RATE; ph -= floorf(ph);
+                float env = sinf(3.14159f * t / 0.13f);
+                b[i] = ((ph * 2.f - 1.f) * 0.5f + nz() * 0.25f) * env * 0.7f;
+            }
+        }
+    }
+    { /* collar jingle: three detuned bell partials */
+        float *b = alloc_bank(SFX_JINGLE, 0.35f);
+        if (b) for (int i = 0; i < g_bank[SFX_JINGLE].n; i++) {
+            float t = (float)i / AUDIO_RATE, e = expf(-t * 14.f);
+            b[i] = (sinf(TAU * 3520.f * t) + 0.7f * sinf(TAU * 4410.f * t) + 0.5f * sinf(TAU * 5280.f * t + 1.f)) * 0.14f * e;
+        }
+    }
+    syn_tone(SFX_WHINE, 0.7f, 900.f, 620.f, 5.f, 0);
+    syn_click(SFX_SHUTTER, 0.08f, 0.5f, 90.f, 1);
     for (int i = 0; i < SFX_N; i++) if (!g_bank[i].s) return 0;
     g_ready = 1;
     return 1;

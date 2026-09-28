@@ -72,6 +72,7 @@ static uint32_t key_buttons(const WinState *w) {
     if (w->key['Q'])         b |= BTN_RADIO;     /* M4: cycle radio (in cars) */
     if (w->key['K'])         b |= BTN_FERRY;     /* M4: ferry island <-> city */
     if (w->key['P'])         b |= BTN_PHOTO;
+    if (w->key['O'])         b |= BTN_DOG;       /* M9: Poncho orders */
     if (w->key['H'])         b |= BTN_HEAL;      /* M5 */
     if (w->key['I'])         b |= BTN_CHAR;
     if (w->key['L'])         b |= BTN_LOAD;

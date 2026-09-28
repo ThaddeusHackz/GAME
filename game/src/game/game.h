@@ -19,6 +19,7 @@
 #include "../plat/plat.h"
 #include "../combat/weapon.h"
 #include "../ai/enemy.h"
+#include "../ai/dog.h"
 #include "../city/city.h"
 #include "../meta/progress.h"
 #include "../meta/mission.h"
@@ -246,6 +247,14 @@ typedef struct Game {
     int          ready;
     int          quit;
     Polish       pol;                     /* M7 */
+    /* ── M9: Poncho + photo mode ── */
+    Dog          dog;
+    int          dog_scents;              /* sniffable things in range (HUNT) */
+    float        dog_msg_cd;
+    Vec3         ph_pos;                  /* photo free-cam */
+    float        ph_yaw, ph_pitch, ph_fov, ph_day0;
+    int          ph_filter, ph_shots, ph_capture;
+    char         ph_last[200];
 } Game;
 
 int   game_init(Game *g, int w, int h, int backend, uint32_t seed);
@@ -278,7 +287,11 @@ int   game_save(Game *g, int slot, int is_auto); /* 1 ok */
 int   game_load(Game *g, int slot, int is_auto); /* 1 ok */
 void  game_island_store(Game *g);                /* snapshot island before the ferry */
 int   game_map_reveal_pct(const Game *g);
-void  game_render(Game *g);                                 /* submit + draw */
+void  game_render(Game *g);
+/* M9 */
+int   game_photo_enter(Game *g);                 /* 1 = now in photo mode */
+int   game_photo_filter_count(void);
+const char *game_photo_filter_name(int i);                                 /* submit + draw */
 void  game_message(Game *g, const char *fmt, ...);
 /* M4: act-II world swap (Spec 4.3 — one streaming world per act). Frees the
    island world and rebuilds Meridian City on the same heightfield footprint. */

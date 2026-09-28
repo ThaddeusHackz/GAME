@@ -43,3 +43,9 @@ no copyrighted material is used.
 ## Manifesto
 The game respects your time and your machine. It has no launcher, no account,
 no telemetry and no DRM. Everything runs offline.
+
+## Poncho & photo mode (M9)
+- **E** near the snared dog on the beach frees him; **E** again to pet.
+- **O** heel / stay / hunt. **Aim + O**: send him to distract a guard.
+- If he is knocked down, hold **E** beside him for 3 s (or wait 30 s).
+- **P** photo mode: WASD/mouse fly, Space/Ctrl up/down, 1/2 zoom, R filter, V time, E capture, P exit. Photos go to your user folder under `photos/`.
