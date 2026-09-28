@@ -1,0 +1,10 @@
+# M4 city demo: look around the promenade, walk north, turn to the skyline
+key 0.0 0 0 0x0 0 0
+shot 0.5 m4_harbor_spawn
+key 0.6 0 1 0x2 0 0
+shot 3.0 m4_avenue_walk
+key 3.1 0 0 0x0 0.05 0
+shot 4.5 m4_skyline_turn
+key 4.6 0 0 0x0 0 -0.01
+shot 6.0 m4_downtown
+end 6.2

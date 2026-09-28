@@ -1,0 +1,11 @@
+# M6 story demo: M01 voicemail card, paging with E, then tracker + waypoint
+key 0.0 0 0 0x0 0 0
+shot 2.8 m6_card
+key 3.0 0 0 0x40 0 0
+key 3.1 0 0 0x0 0 0
+key 3.3 0 0 0x40 0 0
+key 3.4 0 0 0x0 0 0
+key 3.6 0 0 0x40 0 0
+key 3.7 0 0 0x0 0 0
+shot 4.2 m6_tracker
+end 4.4

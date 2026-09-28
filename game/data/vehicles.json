@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "comment": "DIVIDED HORIZON vehicle table (Spec 69 anchors, Section 10.4 data-driven). top_kmh/accel_0_100_s/grip/hp/seats/price are law; handling derived in vehicle.c.",
+  "vehicles": [
+    { "id": "V01", "name": "Coralina",     "cls": "compact",  "top_kmh": 145, "accel_0_100_s": 8.0, "grip": 0.85, "hp": 450,  "seats": 4, "price": 3500,  "radio": true },
+    { "id": "V02", "name": "Tiburon GT",   "cls": "muscle",   "top_kmh": 195, "accel_0_100_s": 5.2, "grip": 0.70, "hp": 550,  "seats": 2, "price": 18000, "radio": true },
+    { "id": "V05", "name": "Guagua",       "cls": "taxi",     "top_kmh": 135, "accel_0_100_s": 9.0, "grip": 0.82, "hp": 500,  "seats": 4, "price": 4000,  "radio": true },
+    { "id": "V06", "name": "Sirena",       "cls": "police",   "top_kmh": 180, "accel_0_100_s": 6.0, "grip": 0.85, "hp": 800,  "seats": 4, "price": 0,     "radio": true, "steal_heat": 2 },
+    { "id": "V07", "name": "Fenix",        "cls": "motorcycle","top_kmh": 205, "accel_0_100_s": 4.2, "grip": 0.90, "hp": 300, "seats": 2, "price": 9500,  "radio": false }
+  ]
+}

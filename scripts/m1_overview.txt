@@ -1,0 +1,12 @@
+# M1 verification run: stand at spawn, level the camera, capture the course.
+key 0.00 0.0 0.0 0 0.000 0.000
+key 0.80 0.0 0.0 0 0.000 0.002
+key 2.00 0.0 0.0 0 0.000 0.000
+shot 2.40 m1_course_front
+key 2.60 0.0 0.0 0 0.010 0.000
+key 4.00 0.0 0.0 0 0.000 0.000
+shot 4.40 m1_course_right
+key 4.60 0.0 0.0 0 0.000 -0.004
+key 6.00 0.0 0.0 0 0.000 0.000
+shot 6.40 m1_skyline
+end 7.0

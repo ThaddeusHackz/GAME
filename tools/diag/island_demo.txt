@@ -1,0 +1,18 @@
+# M3 island vertical-slice demo — scout the outpost from the beach drop.
+# game_outpost_start puts the player 62 m south of Punta Quemada facing the
+# yard (yaw=pi). Buttons (hex): FIRE=0x10 AIM=0x20 CROUCH=0x4 BINOC=0x400000.
+# look_dx/look_dy are radians per frame; +look_dy looks up.
+key 0.0  0 0 0 0 0
+shot 0.7 m3_outpost_day
+# slow pan across the yard to read the layout
+key 1.1  0 0 0 -0.0016 0.0004
+shot 2.4 m3_outpost_pan
+# raise the binoculars and hold — the optic zooms to 20 deg and tags hostiles
+key 2.8  0 0 0x400000 0 0
+shot 3.6 m3_binoculars
+key 4.0  0 0 0x400000 0.0009 0
+shot 5.0 m3_binoculars_tag
+# drop the optic, crouch, and settle on the yard
+key 5.4  0 0 0x4 0 0
+shot 6.4 m3_outpost_crouch
+end 7.2
