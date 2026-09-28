@@ -1,6 +1,8 @@
 # Changelog
 
 
+## M17 — El Fraile (B4): bell-telegraphed swings, T-parry on the third ring, TOLL acolytes, chain wrap, kneel + SUBDUE/strike; feat LA TERCER CAMPANA (30 feats); suite 16 (983 checks)
+
 ## M16 — Doña Marea (B3): gunship runs, harpoon windows, anchor sweep, rising tide at sunset; feat LA AGUA CUSTODIA; suite 15 (956 checks)
 
 ## M15b — El Reloj world markers

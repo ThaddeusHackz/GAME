@@ -45,11 +45,28 @@
    strafe run and never below half health) = LA AGUA CUSTODIA.
    Honest deviations: land arena, not docks + real boats; the gunship and
    buoys are box markers; no fire/pier geometry; officer mesh; text only.
-   Bosses 4-6 NOT built. */
+
+   Slot B4: EL FRAILE (M17). Pull the bell rope at the yard's north-east corner
+   (E). The silent giant never speaks: the BELLS telegraph every swing (Spec
+   25/33 - accessibility by design; the HUD also counts the rings as text).
+   Swing cycle: ring... ring... on the THIRD ring a parry window opens (0.5 s,
+   0.35 s from P2). Press T (melee) within 4.5 m inside the window: PARRY - he
+   staggers for 3 s and takes full damage. Miss it within 4.5 m: 20 dmg. At
+   range the swing just whiffs. Outside a stagger he shrugs off 95%.
+     P1 SILENT   rings every 0.8 s
+     P2 TOLL     (<66%) rings every 0.55 s, window 0.35 s, 2 acolytes join
+     P3 LAST BELL (<33%) chain wrap every 8 s drags you in from <=14 m;
+                 at 15% he KNEELS: [E] within 3 m to SUBDUE (spare) or strike
+                 him down. Down: he kneels, rings once, softly. No line.
+   Clean = spared -> LA TERCER CAMPANA.
+   Honest deviations: yard arena, not a bell tower; no smoke/decoy system in
+   P2 (acolytes instead); bells use a pitched synth tone, not a sampled bell;
+   bruiser mesh reused. Bosses 5-6 NOT built. */
 
 #define BOSS_FACTION 5
 static const char *k_boss_phase[4] = { "", "FORMAR", "CORREGIR", "MAS FUERTE!" };
 static const char *k_reloj_phase[4] = { "", "TIC", "TAC", "MEDIANOCHE!" };
+static const char *k_fraile_phase[4] = { "", "SILENT", "TOLL", "LAST BELL" };
 static const char *k_marea_phase[4] = { "", "GUNSHIP RUNS", "PIER BRAWL", "TIDE RISING!" };
 
 int game_boss_active(const Game *g) { return g->boss.active ? g->boss.who : -1; }
@@ -67,6 +84,7 @@ Vec3 game_boss_buoy_pos(const Game *g, int k) {
     p.y = terrain_height(&g->terrain, p.x, p.z); return p;
 }
 #define MAREA_PASS 2.5f
+Vec3 game_boss_tower_pos(const Game *g) { return v3_add(g->arena_center, v3(24.f, 0.f, -38.f)); }
 #define MAREA_CYCLE 9.f
 
 static int boss_alive(const Game *g, int slot) {
@@ -80,6 +98,7 @@ int game_boss_shielded(const Game *g) {
     const Bosses *B = &g->boss;
     if (B->active && B->who == 1) return B->expose_t <= 0.f;
     if (B->active && B->who == 2) return B->lines != 0;
+    if (B->active && B->who == 3) return B->stagger_t <= 0.f && !B->kneel;
     return B->active && B->phase < 3 && B->stagger_t <= 0.f && boss_drums_up(g);
 }
 
@@ -117,6 +136,23 @@ static int reloj_start(Game *g) {
     return 1;
 }
 
+static int fraile_start(Game *g) {
+    Bosses *B = &g->boss;
+    if (g->enemies.count + 3 > ENEMY_MAX) return 0;
+    memset(B->drum, -1, sizeof B->drum); memset(B->shield, -1, sizeof B->shield);
+    memset(B->flank, -1, sizeof B->flank);
+    B->slot = boss_spawn_at(g, 0.f, 10.f, EN_BRUISER, 10.f);
+    if (B->slot < 0) return 0;
+    B->active = 1; B->who = 3; B->phase = 1; B->clean = 0; B->t = 0.f; B->stun_t = 0.f;
+    B->bell_t = 1.2f; B->ring_i = 0; B->parry_t = 0.f; B->stagger_t = 0.f; B->chain_t = 8.f;
+    B->kneel = 0; B->spared = 0; B->parries = 0; B->swings_hit = 0;
+    B->fights++;
+    game_message(g, "EL FRAILE says nothing. Somewhere above, a bell begins to ring.");
+    g->message_t = 4.f;
+    pol_cue(g, SFX_JINGLE, 0.8f, 0.45f);
+    return 1;
+}
+
 static int marea_start(Game *g) {
     Bosses *B = &g->boss;
     if (g->enemies.count + 3 > ENEMY_MAX) return 0;
@@ -139,6 +175,7 @@ static int marea_start(Game *g) {
 int game_boss_start(Game *g, int who) {
     Bosses *B = &g->boss;
     if (who == 2 && !B->active && g->act == 0 && !g->arena_active) return marea_start(g);
+    if (who == 3 && !B->active && g->act == 0 && !g->arena_active) return fraile_start(g);
     if (who == 1 && !B->active && g->act == 0 && !g->arena_active) return reloj_start(g);
     if (who != 0 || B->active || g->act != 0 || g->arena_active) return 0;   /* only B1 exists */
     if (g->enemies.count + 11 > ENEMY_MAX) return 0;
@@ -172,9 +209,11 @@ static void boss_win(Game *g) {
     B->beaten |= 1 << who;
     if (B->clean) B->clean_mask |= 1 << who;
     prog_add_xp(&g->prog, 500);
-    game_stature_add(g, 5.f);
+    game_stature_add(g, (who == 3 && B->spared) ? 10.f : 5.f);
     game_herald_print(g, HT_BOSS, who);
-    game_message(g, who == 2 ? "DONA MAREA: \"The water... keeps what it wants.\"" :
+    if (who == 3) game_message(g, B->spared ? "El Fraile kneels, and rings the bell once. Softly." :
+                                               "El Fraile falls. The bell rope swings, unrung.");
+    else game_message(g, who == 2 ? "DONA MAREA: \"The water... keeps what it wants.\"" :
                     who == 1 ? "EL RELOJ: \"Synchronized... at last.\"" : "LA SARGENTO: \"The unit... stands.\"");
     g->message_t = 5.f;
     pol_cue(g, SFX_MISSION, 0.9f, 1.0f);
@@ -347,14 +386,88 @@ static void marea_frame(Game *g, const PlatInput *in, float dt) {
     if (boss_alive(g, B->slot)) m->armor = B->lines ? 0.95f : 0.f;
 }
 
+#define FRAILE_REACH 4.5f
+static void fraile_frame(Game *g, const PlatInput *in, float dt) {
+    Bosses *B = &g->boss;
+    Player *p = &g->player;
+    Enemy *m = &g->enemies.v[B->slot];
+    float f = m->health / m->health_max;
+    if (B->phase == 1 && f < 0.66f) {
+        B->phase = 2;
+        for (int k = 0; k < 2; k++) B->flank[k] = boss_spawn_at(g, k ? 12.f : -12.f, 14.f, EN_GRUNT, 1.f);
+        game_message(g, "TOLL - the bells quicken. Two acolytes answer."); g->message_t = 3.f;
+    } else if (B->phase == 2 && f < 0.33f) {
+        B->phase = 3; B->chain_t = 4.f;
+        game_message(g, "LAST BELL - he unwinds the bell chain."); g->message_t = 3.f;
+    }
+    Vec3 d = v3_sub(m->pos, p->pos); d.y = 0.f;
+    float dist = v3_len(d);
+    if (B->phase == 3 && !B->kneel && f < 0.15f) {
+        B->kneel = 1; B->parry_t = 0.f; m->speed = 0.f;
+        game_message(g, "El Fraile drops to his knees. [E] SUBDUE him - or strike."); g->message_t = 5.f;
+    }
+    if (B->kneel) {
+        m->vel = v3(0, 0, 0); m->state = EN_COMBAT; m->fire_cd = 99.f;
+        m->armor = 0.f;
+        if (in && (in->pressed & BTN_USE) && dist < 3.f) {
+            B->spared = 1; B->clean = 1;
+            boss_win(g);
+        }
+        return;
+    }
+    if (B->stagger_t > 0.f) B->stagger_t -= dt;
+    /* the bell cycle: three rings, then the swing */
+    float ring_gap = B->phase == 1 ? 0.8f : 0.55f;
+    if (B->parry_t > 0.f) {
+        if (in && (in->pressed & BTN_MELEE) && dist < FRAILE_REACH) {
+            B->parry_t = 0.f; B->stagger_t = 3.f; B->parries++; B->ring_i = 0; B->bell_t = 3.f + ring_gap;
+            game_message(g, "PARRY! He staggers - strike now!"); g->message_t = 2.f;
+            pol_cue(g, SFX_HIT, 1.0f, 1.4f);
+        } else {
+            B->parry_t -= dt;
+            if (B->parry_t <= 0.f) {
+                if (dist < FRAILE_REACH) {
+                    p->health = dh_clampf(p->health - 20.f, 0.f, p->health_max);
+                    B->swings_hit++;
+                    game_message(g, "The swing lands."); g->message_t = 1.2f;
+                    pol_cue(g, SFX_HURT, 0.9f, 0.8f);
+                }
+                B->ring_i = 0; B->bell_t = 1.6f;
+            }
+        }
+    } else if (B->stagger_t <= 0.f) {
+        B->bell_t -= dt;
+        if (B->bell_t <= 0.f) {
+            B->ring_i++;
+            pol_cue(g, SFX_JINGLE, 0.9f, B->ring_i == 3 ? 0.35f : 0.5f);
+            if (B->ring_i >= 3) { B->parry_t = B->phase == 1 ? 0.5f : 0.35f; B->bell_t = ring_gap; }
+            else B->bell_t = ring_gap;
+        }
+    }
+    /* P3 chain wrap */
+    if (B->phase == 3) {
+        B->chain_t -= dt;
+        if (B->chain_t <= 0.f) {
+            B->chain_t = 8.f;
+            if (dist > 2.f && dist < 14.f) {
+                p->vel.x += d.x / dist * 9.f; p->vel.z += d.z / dist * 9.f;
+                game_message(g, "The bell chain wraps you - dragged in!"); g->message_t = 1.5f;
+                pol_cue(g, SFX_WHINE, 0.7f, 0.6f);
+            }
+        }
+    }
+    boss_set_armor(g, 0);
+    m->armor = game_boss_shielded(g) ? 0.95f : 0.f;
+}
+
 static void boss_frame(Game *g, const PlatInput *in, float dt) {
     Bosses *B = &g->boss;
     if (B->prompt_t > 0.f) B->prompt_t -= dt;
     if (g->mode != GM_PLAY) return;
     if (!B->active) {
         if (g->act != 0 || g->arena_active) return;
-        for (int w = 0; w < 3; w++) {
-            Vec3 d = v3_sub(w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
+        for (int w = 0; w < 4; w++) {
+            Vec3 d = v3_sub(w == 3 ? game_boss_tower_pos(g) : w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
             if (v3_len(d) < 3.f) {
                 B->prompt_t = 0.2f; B->prompt_who = w;
                 if (in && (in->pressed & BTN_USE)) game_boss_start(g, w);
@@ -370,7 +483,8 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (p->health < p->health_max * 0.5f) B->clean = 0;
     if (player_is_down(p)) {
         boss_clear(g); B->losses++;
-        game_message(g, B->who == 2 ? "The tide takes you. Ring the harbour bell to try again." :
+        game_message(g, B->who == 3 ? "The bells fall silent over you. Pull the rope to try again." :
+                        B->who == 2 ? "The tide takes you. Ring the harbour bell to try again." :
                         B->who == 1 ? "The clock stops for you. Wind the dial to try again." :
                                       "The drums fade. Beat the war drum to try again."); g->message_t = 4.f;
         return;
@@ -378,6 +492,7 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (g->enemies.v[B->slot].state == EN_DEAD) { boss_win(g); return; }
     if (B->who == 1) { reloj_frame(g, in, dt); return; }
     if (B->who == 2) { marea_frame(g, in, dt); return; }
+    if (B->who == 3) { fraile_frame(g, in, dt); return; }
 
     /* drummer deaths → stagger */
     for (int k = 0; k < 2; k++) {
@@ -440,6 +555,17 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
 static void boss_draw_world(Game *g) {
     Bosses *B = &g->boss;
     B->drawn = 0;
+    if (B->active && B->who == 3 && boss_alive(g, B->slot)) {
+        const Enemy *e = &g->enemies.v[B->slot];
+        for (int k = 0; k < 3; k++) {
+            int lit = k < B->ring_i || B->parry_t > 0.f;
+            uint32_t c = B->parry_t > 0.f ? 0xFF20E0FFu : (lit ? 0xFF30B0E0u : 0xFF404040u);
+            Mat4 bm = m4_mul(m4_translate(v3(e->pos.x - 0.7f + 0.7f * (float)k, e->pos.y + 3.0f, e->pos.z)),
+                             m4_scale(v3(0.45f, 0.45f, 0.45f)));
+            rend_mesh_lit(g->mesh_box, &bm, -1, c, 1.f, 1, 1, 1, 0, 1); B->drawn++;
+        }
+        return;
+    }
     if (B->active && B->who == 2) {
         Vec3 A = g->arena_center;
         if (B->phase == 1) {
@@ -506,7 +632,10 @@ static void boss_draw_hud(Game *g) {
     float ui = settings()->ui_scale, fs = 1.6f * ui;
     if (!B->active) {
         if (B->prompt_t > 0.f) {
-            const char *t = B->prompt_who == 2 ?
+            const char *t = B->prompt_who == 3 ?
+                            ((B->beaten & 8) ? "[E] PULL THE BELL ROPE - rematch EL FRAILE"
+                                             : "[E] PULL THE BELL ROPE - challenge EL FRAILE") :
+                            B->prompt_who == 2 ?
                             ((B->beaten & 4) ? "[E] RING THE HARBOUR BELL - rematch DONA MAREA"
                                              : "[E] RING THE HARBOUR BELL - challenge DONA MAREA") :
                             B->prompt_who == 1 ?
@@ -523,13 +652,21 @@ static void boss_draw_hud(Game *g) {
     }
     float w = (float)g->w * 0.5f, x = (float)g->w * 0.25f, y = 34.f * ui;
     char b[96];
-    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
+    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 3 ? k_fraile_phase : B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
     font_text(x, y - 16.f * ui, fs, b, 0xFF60A0FF);
     rend_quad2d(x, y, w, 8.f * ui, -1, 0, 0, 1, 1, 0xC0101010);
     if (B->slot >= 0 && B->slot < g->enemies.count) {
         const Enemy *e = &g->enemies.v[B->slot];
         float f = e->health_max > 0.f ? e->health / e->health_max : 0.f;
         rend_quad2d(x, y, w * f, 8.f * ui, -1, 0, 0, 1, 1, 0xFF2030D0);
+    }
+    if (B->who == 3) {
+        if (B->kneel) snprintf(b, sizeof b, "HE KNEELS - [E] subdue (3 m) or strike him down");
+        else if (B->stagger_t > 0.f) snprintf(b, sizeof b, "STAGGERED %.1fs - strike!", B->stagger_t);
+        else if (B->parry_t > 0.f) snprintf(b, sizeof b, "THIRD BELL - [T] PARRY NOW!");
+        else snprintf(b, sizeof b, "BELL %d/3  -  parry [T] on the third ring", B->ring_i);
+        font_text(x, y + 11.f * ui, fs * 0.85f, b, (B->parry_t > 0.f || B->stagger_t > 0.f) ? 0xFF40E0FF : 0xFF4080FF);
+        return;
     }
     if (B->who == 2) {
         if (B->phase == 1) {

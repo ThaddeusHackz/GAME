@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
 
     CHECK(game_boss_active(&g) == -1 && game_boss_phase(&g) == 0, "no boss at start");
     CHECK(!strcmp(game_boss_name(0), "LA SARGENTO"), "B1 is La Sargento");
-    CHECK(!game_boss_start(&g, 4), "unbuilt boss slots refuse to start (honest)");
+    CHECK(!game_boss_start(&g, 5), "unbuilt boss slots refuse to start (honest)");
 
     /* E far from the drum does nothing; at the drum it starts the fight */
     press_use(&g);

@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     char b[128];
     (void)kill_hunter; (void)last_head;
     CHECK(!strcmp(game_boss_name(2), "DONA MAREA"), "B3 is Dona Marea");
-    CHECK(!game_boss_start(&g, 3), "unbuilt slot 4 still refuses");
+    CHECK(!game_boss_start(&g, 4), "unbuilt slot 5 still refuses");
 
     Vec3 bp = game_boss_bell_pos(&g);
     g.player.pos = v3(bp.x, bp.y, bp.z - 1.5f); g.player.vel = v3(0, 0, 0);

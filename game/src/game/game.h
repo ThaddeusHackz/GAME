@@ -47,6 +47,8 @@ typedef struct {
     int   bomb_live, dets, cycle, prompt_who, drawn;
     float pass_t, window_t, sweep_t, tide_r, lane_x;   /* B3 Dona Marea */
     int   lines, strafe_hits, harpoon_used, passes, in_pass, lane_hit;
+    float bell_t, parry_t, chain_t;                    /* B4 El Fraile */
+    int   ring_i, kneel, spared, parries, swings_hit;
     int   fights, losses, clean_mask; /* clean_mask: beaten above half health */
 } Bosses;
 
@@ -354,7 +356,8 @@ Vec3  game_boss_clock_pos(const Game *g);
 float game_boss_hand_dist(const Game *g, Vec3 p);       /* clock dial that starts B2 */
 Vec3  game_boss_bomb_pos(const Game *g, int k); /* B2 bomb column k (0..3) */
 Vec3  game_boss_bell_pos(const Game *g);        /* B3 harbour bell (calls Dona Marea) */
-Vec3  game_boss_buoy_pos(const Game *g, int k); /* B3 fuel-line buoy k (0..2) */
+Vec3  game_boss_buoy_pos(const Game *g, int k);
+Vec3  game_boss_tower_pos(const Game *g);        /* B4 bell rope (calls El Fraile) */
 /* M13 bounty squad */
 int   game_cob_spawn(Game *g, int who);
 int   game_cob_fallen(const Game *g);
