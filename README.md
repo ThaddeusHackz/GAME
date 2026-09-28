@@ -28,7 +28,7 @@ dependencies).
 | M10 | Draw-call budget: batched 2D quads, benchmark peaks 1188 → 193 (Low play ≈ 80, budget 900) | 762/762 | [report](docs/reports/M10_report.md) |
 | M11 | Stature (hidden hero/renegade slider, 5 reactions) + the Herald front pages & scrapbook (N) | 795/795 | [report](docs/reports/M11_report.md) |
 | M12 | Feats poster wall: 24 feats (2 secret), wax-seal stamps, +50 XP, saved (J) | 818/818 | [report](docs/reports/M12_report.md) |
-| M13 | Los Cobradores: 4 named bounty hunters, Infamy trigger, scars, obituaries, trinket | 857/857 | [report](docs/reports/M13_report.md) |
+| M13 | Los Cobradores: 4 named bounty hunters, Infamy trigger, scars, obituaries, trinket | 889/889 | [report](docs/reports/M13_report.md) |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

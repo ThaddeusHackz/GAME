@@ -37,6 +37,15 @@ typedef struct {
     float    check_acc;
 } Feats;
 
+/* M14: boss fights (Spec 25/75) — B1 La Sargento */
+#define BOSS_N 6
+typedef struct {
+    int   active, who, phase, clean, slot, drum[2], shield[4], flank[2];
+    float t, beat_t, stagger_t, whistle_t, stun_t, bark_cd, prompt_t;
+    int   beat_i, beaten;            /* beaten: bitmask of bosses defeated */
+    int   fights, losses, clean_mask; /* clean_mask: beaten above half health */
+} Bosses;
+
 /* M13: Los Cobradores bounty squad (Spec 26.2) */
 #define COB_N 4
 typedef struct {
@@ -286,6 +295,7 @@ typedef struct Game {
     Legend       leg;                     /* M11 */
     Feats        feats;                   /* M12 */
     Cobradores   cob;                     /* M13 */
+    Bosses       boss;                    /* M14 */
 } Game;
 
 int   game_init(Game *g, int w, int h, int backend, uint32_t seed);
@@ -329,6 +339,13 @@ const char *game_stature_name(const Game *g);
 void  game_stature_add(Game *g, float d);
 int   game_herald_headline(const Game *g, int page, char *out, int cap);
 int   game_herald_print(Game *g, int tmpl, int val);   /* returns page index */
+/* M14 bosses */
+int   game_boss_start(Game *g, int who);        /* 1 = fight began */
+int   game_boss_active(const Game *g);          /* boss index or -1 */
+int   game_boss_phase(const Game *g);           /* 1..3, 0 idle */
+int   game_boss_shielded(const Game *g);        /* shield wall up (cadence) */
+const char *game_boss_name(int who);
+Vec3  game_boss_drum_pos(const Game *g);        /* world war-drum that starts B1 */
 /* M13 bounty squad */
 int   game_cob_spawn(Game *g, int who);
 int   game_cob_fallen(const Game *g);

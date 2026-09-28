@@ -16,7 +16,9 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 enum { HT_EDITION = 0, HT_OUTPOST_QUIET, HT_OUTPOST_LOUD, HT_MAST, HT_ALARM, HT_WANTED,
-       HT_MANHUNT, HT_MISSION, HT_BODYCOUNT, HT_PONCHO, HT_JOB, HT_FERRY, HT_ENDING, HT_OBIT, HT_SQUAD, HT_N };
+       HT_MANHUNT, HT_MISSION, HT_BODYCOUNT, HT_PONCHO, HT_JOB, HT_FERRY, HT_ENDING, HT_OBIT, HT_SQUAD, HT_BOSS, HT_N };
+static const char *k_boss_names[BOSS_N] = { "LA SARGENTO", "BOSS 2", "BOSS 3", "BOSS 4", "BOSS 5", "BOSS 6" };
+const char *game_boss_name(int who) { return (who >= 0 && who < BOSS_N) ? k_boss_names[who] : ""; }
 static const char *k_cob_names[COB_N] = { "RASTRA", "VIDENTE", "PULPO", "LUCKY" };
 const char *game_cob_name(int who) { return (who >= 0 && who < COB_N) ? k_cob_names[who] : ""; }
 
@@ -67,6 +69,9 @@ static const char *k_hd_head[HT_N][3][2] = {
  { { "COBRADORES WIPED OUT", "WHO HUNTS THE HUNTER? THIS ONE." },
    { "LOS COBRADORES DISBANDED", "ALL # HUNTERS FALLEN" },
    { "BOUNTY SQUAD BROKEN", "# HUNTERS, ONE STRANGER" } },
+ { { "& SILENCED: DRUMS GO QUIET", "STRANGER BREAKS &'S UNIT" },
+   { "& DEFEATED IN THE YARD", "THE DRUMS STOP FOR &" },
+   { "& FALLS, UNIT SCATTERS", "LIBERATOR ENDS &'S DRILL" } },
 };
 static const char *k_hd_sub[3] = {
     "Residents lock doors as the drifter's legend darkens.",
@@ -122,6 +127,7 @@ static void hd_fill(char *out, int cap, const char *src, int val) {
     for (const char *c = src; *c && o < cap - 12; c++) {
         if (*c == '#') o += snprintf(out + o, (size_t)(cap - o), "%d", val);
         else if (*c == '@') o += snprintf(out + o, (size_t)(cap - o), "%s", game_cob_name(val));
+        else if (*c == '&') o += snprintf(out + o, (size_t)(cap - o), "%s", game_boss_name(val));
         else out[o++] = *c;
     }
     out[o] = 0;

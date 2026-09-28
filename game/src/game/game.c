@@ -33,6 +33,8 @@ static void  feats_input(struct Game *g, const PlatInput *in);
 static void  feats_draw_toast(struct Game *g);
 static void  cob_frame(struct Game *g, float dt);
 static void  cob_draw_hud(struct Game *g);
+static void  boss_frame(struct Game *g, const PlatInput *in, float dt);
+static void  boss_draw_hud(struct Game *g);
 static void  herald_input(struct Game *g, const PlatInput *in);
 
 /* ── world constants ───────────────────────────────────────────────────── */
@@ -402,6 +404,8 @@ static void build_combat_arena(Game *g)
     prop_top_box(g, A.x + 30.f, h + 1.2f, A.z + 10.5f, 1.2f, 0.6f, 1.2f, WOOD, 0xFFC0D0E0u);
     prop_top_box(g, A.x + 30.f, h + 2.4f, A.z + 13.f, 1.2f, 0.6f, 1.2f, WOOD, 0xFFC0D0E0u);
 
+    /* M14: La Sargento's war drum — beat it (E) to call the boss fight */
+    prop_top_box(g, A.x + 8.f, h + 1.0f, A.z - 38.f, 0.6f, 0.5f, 0.6f, WOOD, 0xFF2020C0u);
     DH_INFO("game", "combat arena built at (%.0f,%.0f) deck %.1f m", A.x, A.z, h);
 }
 
@@ -2261,6 +2265,7 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     legend_frame(g, dt);                     /* M11 stature + Herald */
     feats_frame(g, dt);                      /* M12 feats */
     cob_frame(g, dt);                        /* M13 bounty squad */
+    boss_frame(g, in, dt);                     /* M14 bosses */
 
     /* ── photo mode / debug toggles ── */
     if ((in->pressed & BTN_PHOTO) && game_photo_enter(g)) {
@@ -2491,6 +2496,7 @@ static void draw_minimap(Game *g) {
 #include "herald.inl"       /* M11 stature + the Herald */
 #include "feats.inl"        /* M12 feats poster */
 #include "cobradores.inl"   /* M13 bounty squad */
+#include "boss.inl"         /* M14 bosses */
 
 static void draw_hud(Game *g) {
     Settings *s = settings();
@@ -2844,6 +2850,7 @@ void game_render(Game *g) {
             herald_draw_banner(g);
             feats_draw_toast(g);
             cob_draw_hud(g);
+            boss_draw_hud(g);
             if (g->ui != UI_NONE) sys_draw_screen(g);
             const Player *pp = &g->player;
             if (pp->stance != PL_ST_ZIP && pp->zips) {

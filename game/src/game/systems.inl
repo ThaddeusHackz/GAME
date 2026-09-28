@@ -323,6 +323,7 @@ int game_save(Game *g, int slot, int is_auto) {
     save_set_flag(&s, "feats", (int)g->feats.got);
     save_set_flag(&s, "cob_enc", g->cob.enc[0] | g->cob.enc[1] << 2 | g->cob.enc[2] << 4 | g->cob.enc[3] << 6 | g->cob.trinket << 8);
     save_set_flag(&s, "cob_inf", (int)g->cob.infamy);
+    save_set_flag(&s, "boss", g->boss.beaten | g->boss.clean_mask << 8);
     save_set_flag(&s, "xp_total", pr->xp_total);
     for (int i = 0; i < FT_N; i++) {
         char k[16]; snprintf(k, sizeof k, "ft_%d", i);
@@ -400,6 +401,8 @@ int game_load(Game *g, int slot, int is_auto) {
       for (int i = 0; i < COB_N; i++) g->cob.enc[i] = (ce >> (i * 2)) & 3;
       g->cob.trinket = (ce >> 8) & 1; g->cob.infamy = (float)save_get_flag(&s, "cob_inf", 0);
       g->cob.active = 0; g->cob.primed = 0; g->cob.cd = 60.f; }
+    { int bf = save_get_flag(&s, "boss", 0);
+      g->boss.beaten = bf & 0xFF; g->boss.clean_mask = (bf >> 8) & 0xFF; g->boss.active = 0; }
     g->mode = GM_PLAY;
     g->ui = UI_NONE;
     save_add_stat_ll(&s.stats.saves_loaded, 1);

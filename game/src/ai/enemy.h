@@ -58,6 +58,7 @@ typedef struct {
     int   dropped;          /* loot-drop event flag (consumed by game) */
     int   alerted_team;     /* already shared detection with squad */
     int   tagged;           /* M3: spotted through binoculars — HUD marker */
+    float armor;            /* M14: fraction of damage absorbed (0 = none; boss shield walls) */
 } Enemy;
 
 typedef struct {

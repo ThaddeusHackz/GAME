@@ -121,6 +121,7 @@ int enemy_apply_damage(Enemy *e, float dmg, int zone)
 {
     (void)zone; /* caller already applied zone+falloff multipliers */
     if (!e || e->state == EN_DEAD || !(dmg > 0.f) || !isfinite(dmg)) return 0;
+    if (e->armor > 0.f) dmg *= 1.f - dh_clampf(e->armor, 0.f, 1.f);
     e->health -= dmg;
     e->hit_t = 0.18f;
     e->meter = 1.2f;                       /* getting shot ends all subtlety */

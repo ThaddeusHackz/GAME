@@ -47,3 +47,6 @@ Built the engine, traversal and combat.
 - Only 1 outpost exists (the spec calls for 12). There are no strongholds, no boss fights, and no companion dog.
 - Audio is mono. There are no subtitles and no photo mode.
 - There is no HD pack. Total size is under 1 MB, not ~10 GB. It was not padded.
+
+## M14 — Boss B1 La Sargento
+- War-drum fight in the combat yard: drummers hold up a shield wall, killing one staggers the unit, 3 phases, whistle stun, FORMAR feat, Herald page. Bosses 2–6 not built yet.
