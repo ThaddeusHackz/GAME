@@ -75,12 +75,25 @@
    -> CIUDAD LIMPIA.
    Honest deviations: yard arena, not Downtown at night; vans are drawn
    boxes (not drivable V11s); no tear gas; "no civilians down" is proxied by
-   the 50% HP rule because the arena has no civilians. Boss 6 (El Sereno)
-   NOT built. */
+   the 50% HP rule because the arena has no civilians. FINALE: EL SERENO (M19). Slot 5. The lighthouse lantern at the yard's south
+   (E) - lit only once all five lieutenants have fallen.
+     P1 THE GATHERING  3 cult waves; he watches, untouchable. Each liberated
+                       outpost sends an ally garrison: -1 cultist per wave.
+     P2 THE HOST       cane duel. He calls each cut ("Good. Again.") -
+                       T parries in the 0.4 s window -> 3 s stagger (open).
+     P3 THE OFFERING   at 35% he sheathes the cane and offers the choice:
+                       [E] cut Tobias down  /  [T] hand over the ledger  /
+                       stand silent 8 s (only for a hero: stature tier >= 1
+                       and every lieutenant beaten clean) - the third way.
+   His last line per branch (Spec 75F). No music under the choice (the
+   adaptive layer is ducked while offer_t runs).
+   Honest deviations: arena yard, not the monsoon lighthouse; garrisons are
+   a wave-size reduction, not visible allies; no cutscene camera. */
 
 #define BOSS_FACTION 5
 static const char *k_boss_phase[4] = { "", "FORMAR", "CORREGIR", "MAS FUERTE!" };
 static const char *k_reloj_phase[4] = { "", "TIC", "TAC", "MEDIANOCHE!" };
+static const char *k_sereno_phase[4] = { "", "THE GATHERING", "THE HOST", "THE OFFERING" };
 static const char *k_limp_phase[4] = { "", "VAN PHALANX", "LIMPIO WAVES", "CRANE" };
 static const char *k_fraile_phase[4] = { "", "SILENT", "TOLL", "LAST BELL" };
 static const char *k_marea_phase[4] = { "", "GUNSHIP RUNS", "PIER BRAWL", "TIDE RISING!" };
@@ -100,6 +113,7 @@ Vec3 game_boss_buoy_pos(const Game *g, int k) {
     p.y = terrain_height(&g->terrain, p.x, p.z); return p;
 }
 #define MAREA_PASS 2.5f
+Vec3 game_boss_lantern_pos(const Game *g) { return v3_add(g->arena_center, v3(0.f, 0.f, -52.f)); }
 Vec3 game_boss_radio_pos(const Game *g) { return v3_add(g->arena_center, v3(-16.f, 0.f, -46.f)); }
 Vec3 game_boss_emp_pos(const Game *g)   { return v3_add(g->arena_center, v3(0.f, 0.f, -4.f)); }
 Vec3 game_boss_van_pos(const Game *g, int k) {
@@ -121,6 +135,7 @@ int game_boss_shielded(const Game *g) {
     const Bosses *B = &g->boss;
     if (B->active && B->who == 1) return B->expose_t <= 0.f;
     if (B->active && B->who == 2) return B->lines != 0;
+    if (B->active && B->who == 5) return B->phase != 2 || B->stagger_t <= 0.f;
     if (B->active && B->who == 4) return B->phase < 3 ? B->emp_t <= 0.f : B->shield_t > 0.f;
     if (B->active && B->who == 3) return B->stagger_t <= 0.f && !B->kneel;
     return B->active && B->phase < 3 && B->stagger_t <= 0.f && boss_drums_up(g);
@@ -157,6 +172,46 @@ static int reloj_start(Game *g) {
     game_message(g, "EL RELOJ: \"Tic, tac. Four bombs, one clock - and you are already late.\"");
     g->message_t = 4.f;
     pol_cue(g, SFX_ALARM, 0.7f, 1.3f);
+    return 1;
+}
+
+static int sereno_wave(Game *g) {
+    Bosses *B = &g->boss;
+    int n = 4 - B->allies, up = 0;
+    if (n < 2) n = 2;
+    for (int k = 0; k < 4; k++) {
+        B->shield[k] = k < n ? boss_spawn_at(g, -9.f + 6.f * (float)k, 16.f, EN_GRUNT, 1.f) : -1;
+        if (boss_alive(g, B->shield[k])) up++;
+    }
+    B->wave++;
+    return up;
+}
+static int sereno_wave_alive(const Game *g) {
+    int n = 0; for (int k = 0; k < 4; k++) n += boss_alive(g, g->boss.shield[k]); return n;
+}
+static int sereno_start(Game *g) {
+    Bosses *B = &g->boss;
+    if ((B->beaten & 0x1F) != 0x1F) {
+        int n = 0; for (int k = 0; k < 5; k++) n += (B->beaten >> k) & 1;
+        snprintf(g->message, sizeof g->message, "The lantern is cold. %d of 5 lieutenants have fallen.", n);
+        g->message_t = 3.f;
+        return 0;
+    }
+    if (g->enemies.count + 6 > ENEMY_MAX) return 0;
+    memset(B->drum, -1, sizeof B->drum); memset(B->shield, -1, sizeof B->shield);
+    memset(B->flank, -1, sizeof B->flank);
+    B->slot = boss_spawn_at(g, 0.f, 26.f, EN_OFFICER, 12.f);
+    if (B->slot < 0) return 0;
+    B->active = 1; B->who = 5; B->phase = 1; B->clean = 1; B->t = 0.f; B->stun_t = 0.f;
+    B->wave = 0; B->allies = g->outpost.captured ? 1 : 0; B->ending = 0;
+    B->cane_t = 2.f; B->cane_i = 0; B->parry_t = 0.f; B->stagger_t = 0.f; B->offer_t = 0.f;
+    B->sereno_parries = 0;
+    sereno_wave(g);
+    B->fights++;
+    game_message(g, B->allies ? "EL SERENO: \"You brought friends. Good. Everyone should eat.\""
+                              : "EL SERENO: \"Sit, if you like. The harvest will come to you.\"");
+    g->message_t = 5.f;
+    pol_cue(g, SFX_BIRDS, 0.6f, 0.5f);
     return 1;
 }
 
@@ -218,6 +273,7 @@ int game_boss_start(Game *g, int who) {
     if (who == 2 && !B->active && g->act == 0 && !g->arena_active) return marea_start(g);
     if (who == 3 && !B->active && g->act == 0 && !g->arena_active) return fraile_start(g);
     if (who == 4 && !B->active && g->act == 0 && !g->arena_active) return limp_start(g);
+    if (who == 5 && !B->active && g->act == 0 && !g->arena_active) return sereno_start(g);
     if (who == 1 && !B->active && g->act == 0 && !g->arena_active) return reloj_start(g);
     if (who != 0 || B->active || g->act != 0 || g->arena_active) return 0;   /* only B1 exists */
     if (g->enemies.count + 11 > ENEMY_MAX) return 0;
@@ -251,9 +307,12 @@ static void boss_win(Game *g) {
     B->beaten |= 1 << who;
     if (B->clean) B->clean_mask |= 1 << who;
     prog_add_xp(&g->prog, 500);
-    game_stature_add(g, (who == 3 && B->spared) ? 10.f : 5.f);
+    game_stature_add(g, (who == 3 && B->spared) ? 10.f : who == 5 ? (B->ending == 2 ? -10.f : 10.f) : 5.f);
     game_herald_print(g, HT_BOSS, who);
-    if (who == 3) game_message(g, B->spared ? "El Fraile kneels, and rings the bell once. Softly." :
+    if (who == 5) game_message(g, B->ending == 3 ? "EL SERENO: \"Ah. You were listening.\"" :
+                                  B->ending == 2 ? "EL SERENO: \"Thank you. It was only ever paper.\"" :
+                                                   "EL SERENO: \"Then the family was always the ledger.\"");
+    else if (who == 3) game_message(g, B->spared ? "El Fraile kneels, and rings the bell once. Softly." :
                                                "El Fraile falls. The bell rope swings, unrung.");
     else game_message(g, who == 4 ? "EL LIMPIADOR: \"Report... the city is clean...\"" : who == 2 ? "DONA MAREA: \"The water... keeps what it wants.\"" :
                     who == 1 ? "EL RELOJ: \"Synchronized... at last.\"" : "LA SARGENTO: \"The unit... stands.\"");
@@ -429,6 +488,68 @@ static void marea_frame(Game *g, const PlatInput *in, float dt) {
 }
 
 #define FRAILE_REACH 4.5f
+#define SERENO_REACH 3.2f
+static void sereno_frame(Game *g, const PlatInput *in, float dt) {
+    Bosses *B = &g->boss;
+    Player *p = &g->player;
+    Enemy *m = &g->enemies.v[B->slot];
+    Vec3 d = v3_sub(m->pos, p->pos); d.y = 0.f;
+    float dist = v3_len(d);
+    if (B->phase == 1) {
+        m->vel = v3(0, 0, 0); m->fire_cd = 99.f;           /* he watches from the gallery */
+        if (sereno_wave_alive(g) == 0) {
+            if (B->wave < 3) {
+                sereno_wave(g);
+                snprintf(g->message, sizeof g->message, "THE GATHERING - wave %d of 3.%s", B->wave,
+                         B->allies ? " Your garrison holds the flank." : "");
+                g->message_t = 2.5f;
+            } else {
+                B->phase = 2; B->cane_t = 2.f;
+                game_message(g, "THE HOST - El Sereno draws the cane blade. \"Shall we?\""); g->message_t = 3.f;
+            }
+        }
+    } else if (B->phase == 2) {
+        if (m->health < m->health_max * 0.35f) {
+            B->phase = 3; B->offer_t = 0.f; B->parry_t = 0.f; B->stagger_t = 0.f;
+            m->health = m->health_max * 0.35f;
+            game_message(g, "THE OFFERING - \"Enough. Choose.\"  [E] cut Tobias down   [T] give him the ledger   (or say nothing)");
+            g->message_t = 8.f;
+        } else {
+            if (B->stagger_t > 0.f) B->stagger_t -= dt;
+            if (B->parry_t > 0.f) {
+                if (in && (in->pressed & BTN_MELEE) && dist < SERENO_REACH) {
+                    B->parry_t = 0.f; B->stagger_t = 3.f; B->sereno_parries++; B->cane_t = 3.5f;
+                    game_message(g, "EL SERENO: \"Good. Again.\""); g->message_t = 1.5f;
+                    pol_cue(g, SFX_HIT, 1.0f, 1.2f);
+                } else if ((B->parry_t -= dt) <= 0.f) {
+                    if (dist < SERENO_REACH) {
+                        p->health = dh_clampf(p->health - 18.f, 0.f, p->health_max);
+                        game_message(g, "The cane finds you. \"Too slow.\""); g->message_t = 1.2f;
+                        pol_cue(g, SFX_HURT, 0.9f, 0.9f);
+                    }
+                    B->cane_t = 2.f;
+                }
+            } else if (B->stagger_t <= 0.f && (B->cane_t -= dt) <= 0.f) {
+                static const char *calls[3] = { "\"High.\"", "\"Low.\"", "\"Your left.\"" };
+                B->parry_t = 0.4f;
+                game_message(g, calls[B->cane_i++ % 3]); g->message_t = 0.8f;
+                pol_cue(g, SFX_JINGLE, 0.8f, 0.7f);
+            }
+        }
+    } else {
+        /* the offering: silence is a choice too */
+        m->vel = v3(0, 0, 0); m->fire_cd = 99.f;
+        B->offer_t += dt;
+        int hero = game_stature_tier(g) >= 1 && (B->clean_mask & 0x1F) == 0x1F;
+        if (in && (in->pressed & BTN_USE) && dist < 6.f) B->ending = 1;
+        else if (in && (in->pressed & BTN_MELEE) && dist < 6.f) B->ending = 2;
+        else if (in && in->pressed) B->offer_t = 0.f;                      /* speaking breaks the silence */
+        if (!B->ending && hero && B->offer_t >= 8.f) B->ending = 3;
+        if (B->ending) { B->clean = 1; boss_win(g); return; }
+    }
+    m->armor = game_boss_shielded(g) ? (B->phase == 2 ? 0.9f : 1.f) : 0.f;
+}
+
 static void limp_frame(Game *g, const PlatInput *in, float dt) {
     Bosses *B = &g->boss;
     Player *p = &g->player;
@@ -545,8 +666,8 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (g->mode != GM_PLAY) return;
     if (!B->active) {
         if (g->act != 0 || g->arena_active) return;
-        for (int w = 0; w < 5; w++) {
-            Vec3 d = v3_sub(w == 4 ? game_boss_radio_pos(g) : w == 3 ? game_boss_tower_pos(g) : w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
+        for (int w = 0; w < 6; w++) {
+            Vec3 d = v3_sub(w == 5 ? game_boss_lantern_pos(g) : w == 4 ? game_boss_radio_pos(g) : w == 3 ? game_boss_tower_pos(g) : w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
             if (v3_len(d) < 3.f) {
                 B->prompt_t = 0.2f; B->prompt_who = w;
                 if (in && (in->pressed & BTN_USE)) game_boss_start(g, w);
@@ -562,17 +683,18 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (p->health < p->health_max * 0.5f) B->clean = 0;
     if (player_is_down(p)) {
         boss_clear(g); B->losses++;
-        game_message(g, B->who == 4 ? "Processed. Use the call-box to try again." : B->who == 3 ? "The bells fall silent over you. Pull the rope to try again." :
+        game_message(g, B->who == 5 ? "The lantern gutters. \"Rest. Come back when you are ready.\"" : B->who == 4 ? "Processed. Use the call-box to try again." : B->who == 3 ? "The bells fall silent over you. Pull the rope to try again." :
                         B->who == 2 ? "The tide takes you. Ring the harbour bell to try again." :
                         B->who == 1 ? "The clock stops for you. Wind the dial to try again." :
                                       "The drums fade. Beat the war drum to try again."); g->message_t = 4.f;
         return;
     }
-    if (g->enemies.v[B->slot].state == EN_DEAD) { boss_win(g); return; }
+    if (g->enemies.v[B->slot].state == EN_DEAD) { if (B->who == 5 && !B->ending) B->ending = 1; boss_win(g); return; }
     if (B->who == 1) { reloj_frame(g, in, dt); return; }
     if (B->who == 2) { marea_frame(g, in, dt); return; }
     if (B->who == 3) { fraile_frame(g, in, dt); return; }
     if (B->who == 4) { limp_frame(g, in, dt); return; }
+    if (B->who == 5) { sereno_frame(g, in, dt); return; }
 
     /* drummer deaths → stagger */
     for (int k = 0; k < 2; k++) {
@@ -723,7 +845,10 @@ static void boss_draw_hud(Game *g) {
     float ui = settings()->ui_scale, fs = 1.6f * ui;
     if (!B->active) {
         if (B->prompt_t > 0.f) {
-            const char *t = B->prompt_who == 4 ?
+            const char *t = B->prompt_who == 5 ?
+                            ((B->beaten & 32) ? "[E] LIGHT THE LANTERN - return to EL SERENO"
+                                              : "[E] LIGHT THE LANTERN - the finale") :
+                            B->prompt_who == 4 ?
                             ((B->beaten & 16) ? "[E] CALL-BOX - rematch EL LIMPIADOR"
                                               : "[E] CALL-BOX - summon EL LIMPIADOR") :
                             B->prompt_who == 3 ?
@@ -746,13 +871,21 @@ static void boss_draw_hud(Game *g) {
     }
     float w = (float)g->w * 0.5f, x = (float)g->w * 0.25f, y = 34.f * ui;
     char b[96];
-    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 4 ? k_limp_phase : B->who == 3 ? k_fraile_phase : B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
+    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 5 ? k_sereno_phase : B->who == 4 ? k_limp_phase : B->who == 3 ? k_fraile_phase : B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
     font_text(x, y - 16.f * ui, fs, b, 0xFF60A0FF);
     rend_quad2d(x, y, w, 8.f * ui, -1, 0, 0, 1, 1, 0xC0101010);
     if (B->slot >= 0 && B->slot < g->enemies.count) {
         const Enemy *e = &g->enemies.v[B->slot];
         float f = e->health_max > 0.f ? e->health / e->health_max : 0.f;
         rend_quad2d(x, y, w * f, 8.f * ui, -1, 0, 0, 1, 1, 0xFF2030D0);
+    }
+    if (B->who == 5) {
+        if (B->phase == 1) snprintf(b, sizeof b, "Wave %d/3 - %d cultists. He watches, untouchable.", B->wave, sereno_wave_alive(g));
+        else if (B->phase == 2) snprintf(b, sizeof b, B->parry_t > 0.f ? "HE CALLS THE CUT - [T] PARRY!" :
+                                                    B->stagger_t > 0.f ? "OPEN - strike!" : "Watch the cane. Listen for the call.");
+        else snprintf(b, sizeof b, "[E] Tobias   [T] Ledger   ... silence (%.0fs)", B->offer_t);
+        font_text(x, y + 11.f * ui, fs * 0.85f, b, game_boss_shielded(g) ? 0xFF4080FF : 0xFF40E0FF);
+        return;
     }
     if (B->who == 4) {
         if (B->phase < 3) {

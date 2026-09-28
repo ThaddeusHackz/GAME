@@ -51,6 +51,8 @@ typedef struct {
     int   ring_i, kneel, spared, parries, swings_hit;
     float emp_t, emp_cd, van_t, shield_t;              /* B5 El Limpiador */
     int   van_i, emps, elites_up;
+    float cane_t, offer_t;                              /* F El Sereno */
+    int   wave, allies, ending, cane_i, sereno_parries;  /* ending 1 Tobias 2 Ledger 3 Silence */
     int   fights, losses, clean_mask; /* clean_mask: beaten above half health */
 } Bosses;
 
@@ -360,7 +362,8 @@ Vec3  game_boss_bomb_pos(const Game *g, int k); /* B2 bomb column k (0..3) */
 Vec3  game_boss_bell_pos(const Game *g);        /* B3 harbour bell (calls Dona Marea) */
 Vec3  game_boss_buoy_pos(const Game *g, int k);
 Vec3  game_boss_tower_pos(const Game *g);
-Vec3  game_boss_radio_pos(const Game *g);        /* B5 police call-box (calls El Limpiador) */
+Vec3  game_boss_radio_pos(const Game *g);
+Vec3  game_boss_lantern_pos(const Game *g);      /* F lighthouse lantern (calls El Sereno; needs B1-B5) */
 Vec3  game_boss_emp_pos(const Game *g);          /* B5 EMP node */
 Vec3  game_boss_van_pos(const Game *g, int k);   /* B5 van k (0..1) */        /* B4 bell rope (calls El Fraile) */
 /* M13 bounty squad */

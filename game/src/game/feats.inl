@@ -35,6 +35,8 @@ static int ft_boss2(Game *g)     { return (g->boss.clean_mask >> 1) & 1; }
 static int ft_boss3(Game *g)     { return (g->boss.clean_mask >> 2) & 1; }
 static int ft_boss4(Game *g)     { return (g->boss.clean_mask >> 3) & 1; }
 static int ft_boss5(Game *g)     { return (g->boss.clean_mask >> 4) & 1; }
+static int ft_boss6(Game *g)     { return (g->boss.beaten >> 5) & 1; }
+static int ft_third(Game *g)     { return g->boss.ending == 3; }
 static int ft_s_distract(Game *g){ return g->dog.distracts >= 5; }
 static int ft_s_menacedog(Game *g){ return ft_menace(g) && ft_bond5(g); }
 
@@ -68,6 +70,8 @@ static const struct { const char *name, *desc; FeatFn fn; int secret; } k_feats[
     { "LA AGUA CUSTODIA",    "Beat Dona Marea at sunset without eating a strafe run.", ft_boss3, 0 },
     { "LA TERCER CAMPANA",   "Spare El Fraile when he kneels.", ft_boss4, 0 },
     { "CIUDAD LIMPIA",       "Beat El Limpiador without dropping below half health.", ft_boss5, 0 },
+    { "THE LAST LIGHT",      "Face El Sereno at the lantern and end the harvest.", ft_boss6, 0 },
+    { "YOU WERE LISTENING",  "Find the third way: say nothing.", ft_third, 0 },
     { "THE DOG JUDGES YOU", "Send Poncho to distract guards 5 times.",    ft_s_distract, 1 },
     { "WHO'S A GOOD MENACE","Be a Menace whose dog still adores them.",   ft_s_menacedog, 1 },
 };

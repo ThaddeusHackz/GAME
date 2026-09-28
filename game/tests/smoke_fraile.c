@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
     (void)kill_hunter; (void)last_head; (void)step; (void)kill;
     char b[128];
     CHECK(!strcmp(game_boss_name(3), "EL FRAILE"), "B4 is El Fraile");
-    CHECK(!game_boss_start(&g, 5), "unbuilt slot 6 still refuses");
+    CHECK(!game_boss_start(&g, 5), "finale refuses until all lieutenants fall");
     CHECK(has(&g, "LA TERCER CAMPANA") == 0, "feat LA TERCER CAMPANA exists, locked");
 
     Vec3 tp = game_boss_tower_pos(&g);

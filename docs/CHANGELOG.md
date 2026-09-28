@@ -2,6 +2,8 @@
 
 
 
+## M19 — El Sereno (finale, slot 5): lighthouse lantern needs all 5 lieutenants; P1 THE GATHERING (3 waves, -1 per wave if an outpost is liberated), P2 THE HOST (called cuts, T-parry 0.4 s -> 3 s stagger, "Good. Again."), P3 THE OFFERING ([E] Tobias / [T] ledger / 8 s silence for clean hero); feats THE LAST LIGHT + YOU WERE LISTENING (33); suite 18 (1038 checks)
+
 ## M18 — El Limpiador (B5): call-box summon, 2 shield vans + EMP node (6 s stall / 12 s cd), LIMPIO WAVES elites, CRANE riot-shield cycle; feat CIUDAD LIMPIA (31 feats); suite 17 (1012 checks)
 ## M17 — El Fraile (B4): bell-telegraphed swings, T-parry on the third ring, TOLL acolytes, chain wrap, kneel + SUBDUE/strike; feat LA TERCER CAMPANA (30 feats); suite 16 (983 checks)
 

@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     (void)kill_hunter; (void)step; (void)kill;
     char b[128];
     CHECK(!strcmp(game_boss_name(4), "EL LIMPIADOR"), "B5 is El Limpiador");
-    CHECK(!game_boss_start(&g, 5), "unbuilt slot 6 still refuses");
+    CHECK(!game_boss_start(&g, 5), "finale refuses until all lieutenants fall");
     CHECK(has(&g, "CIUDAD LIMPIA") == 0, "feat CIUDAD LIMPIA exists, locked");
 
     Vec3 rp = game_boss_radio_pos(&g);

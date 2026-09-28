@@ -414,6 +414,8 @@ static void build_combat_arena(Game *g)
     prop_top_box(g, A.x + 24.f, h + 2.2f, A.z - 38.f, 0.12f, 1.2f, 0.12f, WOOD, 0xFF3070A0u);
     /* M18: police call-box - pull to summon El Limpiador (B5) */
     prop_top_box(g, A.x - 16.f, h + 0.8f, A.z - 46.f, 0.4f, 0.8f, 0.4f, WOOD, 0xFFA04020u);
+    /* M19: the lighthouse lantern - El Sereno's finale */
+    prop_top_box(g, A.x, h + 2.6f, A.z - 52.f, 0.6f, 0.6f, 0.6f, CONC, 0xFF30C0F0u);
     DH_INFO("game", "combat arena built at (%.0f,%.0f) deck %.1f m", A.x, A.z, h);
 }
 
