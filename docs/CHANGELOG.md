@@ -1,6 +1,9 @@
 # Changelog
 
 
+## M15b — El Reloj world markers
+- Clock hand + bomb columns drawn in 3D (fairness fix). 918 checks.
+
 ## M15 — Boss B2 El Reloj
 - El Reloj boss fight: 4 bomb columns to defuse, a sweeping clock hand, 3 phases.
 - New feat SINCRONIZADO (28 feats). New suite smoke_reloj; 917 checks total.

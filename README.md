@@ -31,6 +31,7 @@ dependencies).
 | M13 | Los Cobradores: 4 named bounty hunters, Infamy trigger, scars, obituaries, trinket | 889/889 | [report](docs/reports/M13_report.md) |
 | M14 | Boss B1 La Sargento: cadence shield wall, 3 phases | 889/889 | [report](docs/reports/M14_report.md) |
 | M15 | Boss B2 El Reloj: bomb columns, clock-hand sweep, 3 phases | 917/917 | [report](docs/reports/M15_report.md) |
+| M15b | El Reloj hand + bomb columns visible in world | 14 suites / 918 checks |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

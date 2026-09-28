@@ -25,7 +25,7 @@
    burns 25 HP/s.  P1 TIC 0.35 rad/s, P2 TAC 0.55 rad/s + 35 s timers,
    P3 MEDIANOCHE: the hand reverses at 0.85 rad/s and El Reloj speeds up.
    Clean win (zero detonations) = SINCRONIZADO. Honest deviations: the hand and
-   bombs are drawn as simple props/HUD markers, not bespoke models; officer mesh
+   bombs are drawn as simple box markers (M15b), not bespoke models; officer mesh
    reused; text barks only. Bosses 3–6 NOT built. */
 
 #define BOSS_FACTION 5
@@ -293,6 +293,38 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
         }
     }
     if (B->stun_t > 0.f) { B->stun_t -= dt; p->vel.x *= 0.2f; p->vel.z *= 0.2f; }
+}
+
+/* M15b: world markers for El Reloj — the sweeping hand and the bomb columns.
+   Hand = 13 orange slabs hugging the terrain so it reads on slopes; bomb columns
+   = tall red pillars (blink in the last 10 s), grey stubs when defused. */
+static void boss_draw_world(Game *g) {
+    Bosses *B = &g->boss;
+    B->drawn = 0;
+    if (!B->active || B->who != 1) return;
+    Vec3 A = g->arena_center;
+    float dx = sinf(B->hand_ang), dz = cosf(B->hand_ang);
+    for (int i = 0; i < 13; i++) {
+        float t = 1.f + 2.f * (float)i;
+        float x = A.x + dx * t, z = A.z + dz * t;
+        float y = terrain_height(&g->terrain, x, z) + 0.12f;
+        Mat4 m = m4_trs(v3(x, y, z), B->hand_ang, 0.f, 0.f, v3(2.4f, 0.24f, 2.05f));
+        rend_mesh_lit(g->mesh_box, &m, -1, (i & 1) ? 0xFF1060F0u : 0xFF2080FFu, 1.f, 1, 1, 1, 0, 1);
+        B->drawn++;
+    }
+    { Mat4 hub = m4_mul(m4_translate(v3(A.x, terrain_height(&g->terrain, A.x, A.z) + 0.6f, A.z)),
+                        m4_scale(v3(1.6f, 1.2f, 1.6f)));
+      rend_mesh_lit(g->mesh_box, &hub, -1, 0xFF303030u, 1.f, 1, 1, 1, 0, 1); B->drawn++; }
+    int blink = B->bomb_t < 10.f && ((int)(B->bomb_t * 4.f) & 1);
+    for (int k = 0; k < 4; k++) {
+        Vec3 p = game_boss_bomb_pos(g, k);
+        int live = (B->bomb_live >> k) & 1;
+        float h = live ? 2.6f : 0.6f;
+        uint32_t c = !live ? 0xFF707070u : (blink ? 0xFFFFFFFFu : 0xFF2020D0u);
+        Mat4 m = m4_mul(m4_translate(v3(p.x, p.y + h * 0.5f, p.z)), m4_scale(v3(0.8f, h, 0.8f)));
+        rend_mesh_lit(g->mesh_box, &m, -1, c, 1.f, 1, 1, 1, 0, 1);
+        B->drawn++;
+    }
 }
 
 static void boss_draw_hud(Game *g) {

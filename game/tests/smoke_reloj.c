@@ -116,6 +116,7 @@ int main(int argc, char **argv) {
     m->health = m->health_max * 0.3f; run(&g, 2);
     CHECK(game_boss_phase(&g) == 3 && g.boss.hand_spd < 0.f, "P3 MEDIANOCHE: hand reverses");
     game_render(&g);
+    CHECK(g.boss.drawn == 18, "hand (13+hub) and 4 columns drawn in world (%d)", g.boss.drawn);
     snprintf(b, sizeof b, "%s/reloj_hud.png", out); rend_save_png(b);
 
     /* win (not clean) */

@@ -44,7 +44,7 @@ typedef struct {
     float t, beat_t, stagger_t, whistle_t, stun_t, bark_cd, prompt_t;
     int   beat_i, beaten;            /* beaten: bitmask of bosses defeated */
     float bomb_t, hand_ang, hand_spd, expose_t;   /* B2 El Reloj */
-    int   bomb_live, dets, cycle, prompt_who;
+    int   bomb_live, dets, cycle, prompt_who, drawn;
     int   fights, losses, clean_mask; /* clean_mask: beaten above half health */
 } Bosses;
 

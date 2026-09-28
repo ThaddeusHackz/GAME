@@ -2833,6 +2833,7 @@ void game_render(Game *g) {
     draw_props(g);
     if (g->act == 1) city_render(&g->city, g);
     draw_enemies(g);
+    boss_draw_world(g);                 /* M15b: El Reloj hand + bombs */
     if (g->act == 0) {
         draw_critters(g);
         draw_outpost_flag(g);
