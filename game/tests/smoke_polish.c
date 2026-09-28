@@ -18,6 +18,7 @@
 #include "../src/ai/enemy.h"
 #include "../src/rend/rend.h"
 #include "../src/city/heat.h"
+#include "../src/meta/bench.h"
 #include "../src/city/city.h"
 #include "../src/meta/progress.h"
 #include "../src/meta/mission.h"
@@ -153,6 +154,24 @@ int main(int argc, char **argv) {
     run(&g, 0, 0.f, 1);
     CHECK(g.pol.intensity > 0.4f, "combat raises music intensity target (%.2f)", g.pol.intensity);
 
+    /* ── M8: benchmark statistics (Spec 37.1) ── */
+    {
+        static float ms[1000]; BenchResult br[3];
+        for (int i = 0; i < 1000; i++) ms[i] = 10.0f;      /* 100 fps flat */
+        for (int i = 0; i < 10; i++) ms[i * 97] = 50.0f;   /* 10 hitches = 1% */
+        ms[500] = 100.0f;                                   /* one 0.1% spike */
+        bench_compute(ms, 1000, &br[0]);
+        CHECK(br[0].frames == 1000, "bench counts frames");
+        CHECK(br[0].avg_fps > 90.f && br[0].avg_fps < 100.f, "bench avg fps sane");
+        CHECK(br[0].low1_fps > 17.f && br[0].low1_fps < 20.f, "bench 1%% low = mean of slowest 10 frames");
+        CHECK(br[0].low01_fps > 9.9f && br[0].low01_fps < 10.1f, "bench 0.1%% low = worst frame");
+        CHECK(ms[0] == 50.0f, "bench does not reorder caller data");
+        br[1] = br[0]; br[2] = br[0];
+        CHECK(bench_recommend(br, 3, 1) == 0, "stuttering machine → step preset down");
+        br[0].low1_fps = br[1].low1_fps = br[2].low1_fps = 130.f;
+        CHECK(bench_recommend(br, 3, 1) == 3, "big headroom → step preset up");
+        CHECK(bench_write_report("build/smoke/benchmark_test.txt", br, 3, 1, 320, 180, "soft"), "bench writes report");
+    }
     DH_INFO("smoke7", "──── %d checks, %d failed ────", g_checks, g_failed);
     game_free(&g);
     if (g_failed) { printf("M7 POLISH SMOKE FAILED: %d/%d\n", g_failed, g_checks); return 1; }

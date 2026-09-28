@@ -17,6 +17,8 @@
 #include "game/game.h"
 #include "plat/plat.h"
 #include "audio/audio.h"
+#include "meta/bench.h"
+#include "rend/rend.h"
 #include "core/dh_log.h"
 #include "core/settings.h"
 
@@ -41,6 +43,9 @@ typedef struct {
     int   story;               /* M6: -1 auto, 0 off, 1 on */
     int   night;               /* M3: begin at night to show the day/night cycle */
     int   city;                /* M4: boot straight into Meridian City (act II) */
+    int   bench;               /* M8: --benchmark (Spec 37.1) */
+    int   bench_frames;        /* frames per scene */
+    int   safe_mode;           /* M8: --safe-mode → software renderer + Low */
 } LaunchOpts;
 
 static void usage(void) {
@@ -63,6 +68,8 @@ static void usage(void) {
 "  --night             begin the day/night cycle at night\n"
 "  --city              start in Meridian City (M4 act II: cars, heat, hot dogs)\n"
 "  --fast              no frame pacing (benchmark)\n"
+"  --benchmark [N]     run 3 benchmark scenes (N frames each), write benchmark.txt\n"
+"  --safe-mode         force the software renderer + Low preset (if it will not boot)\n"
 "  -v, --verbose       debug logging to stdout\n"
 "  -h, --help          this text\n");
 }
@@ -93,6 +100,11 @@ static int parse_args(int argc, char **argv, LaunchOpts *o) {
         else if (!strcmp(a, "--story"))   o->story = 1;
         else if (!strcmp(a, "--no-story")) o->story = 0;
         else if (!strcmp(a, "--city"))    o->city = 1;
+        else if (!strcmp(a, "--safe-mode")) o->safe_mode = 1;
+        else if (!strcmp(a, "--benchmark")) {
+            o->bench = 1; o->bench_frames = 0; o->no_pacing = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') o->bench_frames = atoi(argv[++i]);
+        }
         else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) o->verbose = 1;
         else if (!strcmp(a, "-h") || !strcmp(a, "--help")) { usage(); return 0; }
         else if (!strcmp(a, "--soft")) o->backend = REND_SOFT;
@@ -110,6 +122,54 @@ static int parse_args(int argc, char **argv, LaunchOpts *o) {
     return 1;
 }
 
+/* ── M8 benchmark (Spec 37.1): three scenes, AVG / 1% / 0.1% lows ── */
+static int bench_scene(Game *g, Plat *plat, int scene, int frames, BenchResult *r) {
+    static const char *names[3] = { "island_vista", "outpost_swarm", "city_night" };
+    float *ms = (float *)malloc(sizeof(float) * (size_t)frames);
+    if (!ms) return 0;
+    snprintf(r->name, sizeof r->name, "%s", names[scene]);
+    r->max_draw_calls = r->max_tris = 0;
+    if (scene == 0) { game_start_play(g); game_set_time(g, 0.30f); }
+    if (scene == 1) { game_arena_start(g, 30); game_set_time(g, 0.45f); }
+    if (scene == 2) { game_load_city(g); game_set_time(g, 0.85f); }
+    PlatInput in;
+    int n = 0;
+    for (int i = 0; i < frames + 30; i++) {           /* 30 warm-up frames */
+        if (!plat->poll(plat, &in)) break;
+        memset(&in, 0, sizeof in);
+        uint64_t t0 = plat_now_us();
+        g->player.yaw += 0.35f * DH_TICK_DT;           /* slow pan: the vista crawl */
+        game_frame(g, &in, DH_TICK_DT);
+        game_render(g);
+        RendState *rs = rend();
+        plat->present(plat, rs ? rs->fb : NULL, plat->width, plat->height);
+        plat_audio_pump();
+        uint64_t t1 = plat_now_us();
+        g->player.health = g->player.health_max;       /* the camera must not die */
+        if (i < 30) continue;
+        ms[n++] = (float)(t1 - t0) / 1000.0f;
+        if (rs && rs->draw_calls > r->max_draw_calls) r->max_draw_calls = rs->draw_calls;
+        if (rs && rs->tris_submitted > r->max_tris) r->max_tris = rs->tris_submitted;
+    }
+    bench_compute(ms, n, r);
+    free(ms);
+    DH_INFO("bench", "%-14s %4d frames  avg %.1f fps  1%% low %.1f  0.1%% low %.1f  draws<=%d",
+            r->name, r->frames, r->avg_fps, r->low1_fps, r->low01_fps, r->max_draw_calls);
+    return n > 0;
+}
+static int run_benchmark(Game *g, Plat *plat, const LaunchOpts *o) {
+    BenchResult res[3]; memset(res, 0, sizeof res);
+    int ok = 1;
+    for (int s = 0; s < 3; s++) ok &= bench_scene(g, plat, s, o->bench_frames, &res[s]);
+    int preset = settings()->quality;
+    const char *be = rend_backend_name();
+    if (!bench_write_report("benchmark.txt", res, 3, preset, plat->width, plat->height, be))
+        DH_WARN("bench", "could not write benchmark.txt");
+    else DH_INFO("bench", "report written to benchmark.txt (recommended preset %d)",
+                 bench_recommend(res, 3, preset));
+    return ok ? 0 : 4;
+}
+
 int main(int argc, char **argv) {
     LaunchOpts o;
     if (!parse_args(argc, argv, &o)) return 1;
@@ -121,6 +181,16 @@ int main(int argc, char **argv) {
 
     if (o.w <= 0) o.w = o.headless ? 640 : 1280;
     if (o.h <= 0) o.h = o.headless ? 360 : 720;
+
+    if (o.safe_mode) {                  /* Spec 17.2 / 37.4: guaranteed-boot path */
+        o.backend = REND_SOFT;
+        settings_apply_preset(settings(), QUALITY_LOW);
+        DH_INFO("main", "--safe-mode: software renderer, Low preset");
+    }
+    if (o.bench) {
+        if (o.bench_frames <= 0) o.bench_frames = o.headless ? 240 : 900;
+        o.duration = 1e6f; o.story = 0;
+    }
 
     /* ── platform ── */
     Plat *plat = NULL;
@@ -169,6 +239,15 @@ int main(int argc, char **argv) {
     if (o.city) { game_start_play(&game); game_load_city(&game); }   /* M4 act II */
 
     plat_audio_set_null(o.headless);
+
+    if (o.bench) {
+        int rc = run_benchmark(&game, plat, &o);
+        plat_audio_close();
+        game_free(&game);
+        plat_destroy(plat);
+        dh_log_shutdown();
+        return rc;
+    }
 
     /* ── main loop ── */
     PlatInput in;

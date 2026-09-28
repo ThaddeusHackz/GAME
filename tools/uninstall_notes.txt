@@ -1,0 +1,7 @@
+DIVIDED HORIZON - uninstalling
+
+There is no installer, so there is nothing registered with Windows.
+To uninstall, delete the DividedHorizon-win64 folder.
+
+The game writes no registry keys and nothing to AppData.
+Saves, settings and logs all live inside that folder, so back up save_*.json first if you want to keep them.

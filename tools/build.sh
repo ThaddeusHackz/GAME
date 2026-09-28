@@ -59,6 +59,7 @@ GAME_SRC=(
   "$GAME/src/city/city.c"
   "$GAME/src/meta/progress.c"
   "$GAME/src/meta/mission.c"
+  "$GAME/src/meta/bench.c"
   "$GAME/src/audio/audio.c"
   "$GAME/src/game/game.c"
 )
@@ -238,14 +239,21 @@ build_zip() {
   ver=$(grep -o 'DH_VERSION_MAJOR [0-9]*' "$GAME/src/core/dh_types.h" | awk '{print $2}')
   local name="DividedHorizon-v${ver}-win64.zip"
   rm -f "$DIST/$name"
-  ( cd "$DIST" && zip -q -9 "$name" DividedHorizon.exe )
-  # docs + balance table ship NEXT TO the exe (data dir resolves to ".")
-  ( cd "$ROOT" && [ -f LICENSES.md ] && zip -q -9 "$DIST/$name" LICENSES.md )
-  ( cd "$ROOT" && [ -f README.md ]   && zip -q -9 "$DIST/$name" README.md )
-  ( cd "$GAME/data" && [ -f weapons.json ] && zip -q -9 "$DIST/$name" weapons.json )
-  ( cd "$GAME/data" && [ -f vehicles.json ] && zip -q -9 "$DIST/$name" vehicles.json )
-  ( cd "$GAME/data" && [ -f economy.json ] && zip -q -9 "$DIST/$name" economy.json )
-  ( cd "$GAME/data" && [ -f missions.json ] && zip -q -9 "$DIST/$name" missions.json )
+  # Spec 17.2 layout: one top-level folder, exe + data beside it, docs/ subfolder
+  local stage="$DIST/stage" top="DividedHorizon-win64"
+  rm -rf "$stage"; mkdir -p "$stage/$top/docs"
+  cp "$DIST/DividedHorizon.exe" "$stage/$top/"
+  for j in weapons vehicles economy missions; do
+    [ -f "$GAME/data/$j.json" ] && cp "$GAME/data/$j.json" "$stage/$top/"
+  done
+  printf '@echo off\r\nstart "" DividedHorizon.exe --safe-mode\r\n' > "$stage/$top/SafeMode.bat"
+  printf '@echo off\r\nDividedHorizon.exe --benchmark\r\ntype benchmark.txt\r\npause\r\n' > "$stage/$top/Benchmark.bat"
+  cp "$ROOT/docs/README_PLAYER.md" "$stage/$top/README.md"
+  for d in LICENSES.md README.md; do [ -f "$ROOT/$d" ] && cp "$ROOT/$d" "$stage/$top/docs/"; done
+  mv "$stage/$top/docs/README.md" "$stage/$top/docs/DEVELOPER_README.md"
+  cp "$ROOT/docs/CHANGELOG.md" "$ROOT/tools/uninstall_notes.txt" "$stage/$top/docs/"
+  ( cd "$stage" && zip -q -9 -r "../$name" "$top" )
+  rm -rf "$stage"
   echo "   ✓ dist/$name ($(du -h "$DIST/$name" | cut -f1))"
 }
 
