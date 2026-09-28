@@ -17,7 +17,7 @@
 
 enum { HT_EDITION = 0, HT_OUTPOST_QUIET, HT_OUTPOST_LOUD, HT_MAST, HT_ALARM, HT_WANTED,
        HT_MANHUNT, HT_MISSION, HT_BODYCOUNT, HT_PONCHO, HT_JOB, HT_FERRY, HT_ENDING, HT_OBIT, HT_SQUAD, HT_BOSS, HT_N };
-static const char *k_boss_names[BOSS_N] = { "LA SARGENTO", "EL RELOJ", "DONA MAREA", "EL FRAILE", "BOSS 5", "BOSS 6" };
+static const char *k_boss_names[BOSS_N] = { "LA SARGENTO", "EL RELOJ", "DONA MAREA", "EL FRAILE", "EL LIMPIADOR", "BOSS 6" };
 const char *game_boss_name(int who) { return (who >= 0 && who < BOSS_N) ? k_boss_names[who] : ""; }
 static const char *k_cob_names[COB_N] = { "RASTRA", "VIDENTE", "PULPO", "LUCKY" };
 const char *game_cob_name(int who) { return (who >= 0 && who < COB_N) ? k_cob_names[who] : ""; }

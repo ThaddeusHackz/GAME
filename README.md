@@ -34,6 +34,7 @@ dependencies).
 | M15b | El Reloj hand + bomb columns visible in world | 14 suites / 918 checks |
 | M16 | Boss B3 Doña Marea: gunship runs + harpoon windows, anchor sweep, rising tide at sunset | 15 suites / 956 checks |
 | M17 | Boss B4 El Fraile: bell-telegraphed parry duel, chain wrap, mercy choice | 16 suites / 983 checks |
+| M18 | Boss B5 El Limpiador: van phalanx + EMP stall, Limpio elites, riot-shield gap duel | 17 suites / 1012 checks |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

@@ -1,6 +1,8 @@
 # Changelog
 
 
+
+## M18 — El Limpiador (B5): call-box summon, 2 shield vans + EMP node (6 s stall / 12 s cd), LIMPIO WAVES elites, CRANE riot-shield cycle; feat CIUDAD LIMPIA (31 feats); suite 17 (1012 checks)
 ## M17 — El Fraile (B4): bell-telegraphed swings, T-parry on the third ring, TOLL acolytes, chain wrap, kneel + SUBDUE/strike; feat LA TERCER CAMPANA (30 feats); suite 16 (983 checks)
 
 ## M16 — Doña Marea (B3): gunship runs, harpoon windows, anchor sweep, rising tide at sunset; feat LA AGUA CUSTODIA; suite 15 (956 checks)

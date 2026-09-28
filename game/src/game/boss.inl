@@ -61,11 +61,27 @@
    Clean = spared -> LA TERCER CAMPANA.
    Honest deviations: yard arena, not a bell tower; no smoke/decoy system in
    P2 (acolytes instead); bells use a pitched synth tone, not a sampled bell;
-   bruiser mesh reused. Bosses 5-6 NOT built. */
+   bruiser mesh reused.
+
+   Slot B5: EL LIMPIADOR (M18). Silas Crane. Call-box at the yard's south-west
+   (E). Two Limpio vans circle between cover points; while ANY van is running
+   he is shielded (90%). Hack the EMP node at the yard centre (E, 12 s
+   cooldown) -> both vans stall 6 s and he is exposed.
+     P1 VAN PHALANX   vans reposition every 5 s
+     P2 LIMPIO WAVES  (<66%) 3 white-armoured elites (50% armour)
+     P3 CRANE         (<33%) vans burn out; riot shield cycle: 3 s up (95%),
+                      1.6 s down while he fires - shoot in the gap.
+   Down: "Report... the city is clean..."  Clean = never below 50% HP
+   -> CIUDAD LIMPIA.
+   Honest deviations: yard arena, not Downtown at night; vans are drawn
+   boxes (not drivable V11s); no tear gas; "no civilians down" is proxied by
+   the 50% HP rule because the arena has no civilians. Boss 6 (El Sereno)
+   NOT built. */
 
 #define BOSS_FACTION 5
 static const char *k_boss_phase[4] = { "", "FORMAR", "CORREGIR", "MAS FUERTE!" };
 static const char *k_reloj_phase[4] = { "", "TIC", "TAC", "MEDIANOCHE!" };
+static const char *k_limp_phase[4] = { "", "VAN PHALANX", "LIMPIO WAVES", "CRANE" };
 static const char *k_fraile_phase[4] = { "", "SILENT", "TOLL", "LAST BELL" };
 static const char *k_marea_phase[4] = { "", "GUNSHIP RUNS", "PIER BRAWL", "TIDE RISING!" };
 
@@ -84,6 +100,13 @@ Vec3 game_boss_buoy_pos(const Game *g, int k) {
     p.y = terrain_height(&g->terrain, p.x, p.z); return p;
 }
 #define MAREA_PASS 2.5f
+Vec3 game_boss_radio_pos(const Game *g) { return v3_add(g->arena_center, v3(-16.f, 0.f, -46.f)); }
+Vec3 game_boss_emp_pos(const Game *g)   { return v3_add(g->arena_center, v3(0.f, 0.f, -4.f)); }
+Vec3 game_boss_van_pos(const Game *g, int k) {
+    static const float px[4] = { -10.f, 10.f, 12.f, -12.f }, pz[4] = { 18.f, 18.f, 2.f, 2.f };
+    int i = (g->boss.van_i + k * 2) & 3;
+    return v3_add(g->arena_center, v3(px[i], 0.f, pz[i]));
+}
 Vec3 game_boss_tower_pos(const Game *g) { return v3_add(g->arena_center, v3(24.f, 0.f, -38.f)); }
 #define MAREA_CYCLE 9.f
 
@@ -98,6 +121,7 @@ int game_boss_shielded(const Game *g) {
     const Bosses *B = &g->boss;
     if (B->active && B->who == 1) return B->expose_t <= 0.f;
     if (B->active && B->who == 2) return B->lines != 0;
+    if (B->active && B->who == 4) return B->phase < 3 ? B->emp_t <= 0.f : B->shield_t > 0.f;
     if (B->active && B->who == 3) return B->stagger_t <= 0.f && !B->kneel;
     return B->active && B->phase < 3 && B->stagger_t <= 0.f && boss_drums_up(g);
 }
@@ -133,6 +157,23 @@ static int reloj_start(Game *g) {
     game_message(g, "EL RELOJ: \"Tic, tac. Four bombs, one clock - and you are already late.\"");
     g->message_t = 4.f;
     pol_cue(g, SFX_ALARM, 0.7f, 1.3f);
+    return 1;
+}
+
+static int limp_start(Game *g) {
+    Bosses *B = &g->boss;
+    if (g->enemies.count + 5 > ENEMY_MAX) return 0;
+    memset(B->drum, -1, sizeof B->drum); memset(B->shield, -1, sizeof B->shield);
+    memset(B->flank, -1, sizeof B->flank);
+    B->slot = boss_spawn_at(g, 0.f, 12.f, EN_OFFICER, 10.f);
+    if (B->slot < 0) return 0;
+    B->active = 1; B->who = 4; B->phase = 1; B->clean = 1; B->t = 0.f; B->stun_t = 0.f;
+    B->emp_t = 0.f; B->emp_cd = 0.f; B->van_t = 5.f; B->van_i = 0; B->shield_t = 3.f;
+    B->emps = 0; B->elites_up = 0;
+    B->fights++;
+    game_message(g, "EL LIMPIADOR: \"Citizen. Remain where you are. This will be tidy.\"");
+    g->message_t = 4.f;
+    pol_cue(g, SFX_SIREN, 0.8f, 1.0f);
     return 1;
 }
 
@@ -176,6 +217,7 @@ int game_boss_start(Game *g, int who) {
     Bosses *B = &g->boss;
     if (who == 2 && !B->active && g->act == 0 && !g->arena_active) return marea_start(g);
     if (who == 3 && !B->active && g->act == 0 && !g->arena_active) return fraile_start(g);
+    if (who == 4 && !B->active && g->act == 0 && !g->arena_active) return limp_start(g);
     if (who == 1 && !B->active && g->act == 0 && !g->arena_active) return reloj_start(g);
     if (who != 0 || B->active || g->act != 0 || g->arena_active) return 0;   /* only B1 exists */
     if (g->enemies.count + 11 > ENEMY_MAX) return 0;
@@ -213,7 +255,7 @@ static void boss_win(Game *g) {
     game_herald_print(g, HT_BOSS, who);
     if (who == 3) game_message(g, B->spared ? "El Fraile kneels, and rings the bell once. Softly." :
                                                "El Fraile falls. The bell rope swings, unrung.");
-    else game_message(g, who == 2 ? "DONA MAREA: \"The water... keeps what it wants.\"" :
+    else game_message(g, who == 4 ? "EL LIMPIADOR: \"Report... the city is clean...\"" : who == 2 ? "DONA MAREA: \"The water... keeps what it wants.\"" :
                     who == 1 ? "EL RELOJ: \"Synchronized... at last.\"" : "LA SARGENTO: \"The unit... stands.\"");
     g->message_t = 5.f;
     pol_cue(g, SFX_MISSION, 0.9f, 1.0f);
@@ -387,6 +429,43 @@ static void marea_frame(Game *g, const PlatInput *in, float dt) {
 }
 
 #define FRAILE_REACH 4.5f
+static void limp_frame(Game *g, const PlatInput *in, float dt) {
+    Bosses *B = &g->boss;
+    Player *p = &g->player;
+    Enemy *m = &g->enemies.v[B->slot];
+    float f = m->health / m->health_max;
+    if (B->phase == 1 && f < 0.66f) {
+        B->phase = 2; B->elites_up = 0;
+        for (int k = 0; k < 3; k++) {
+            B->shield[k] = boss_spawn_at(g, -10.f + 10.f * (float)k, 20.f, EN_GRUNT, 1.2f);
+            if (boss_alive(g, B->shield[k])) { g->enemies.v[B->shield[k]].armor = 0.5f; B->elites_up++; }
+        }
+        game_message(g, "LIMPIO WAVES - white-armoured elites deploy."); g->message_t = 3.f;
+    } else if (B->phase == 2 && f < 0.33f) {
+        B->phase = 3; B->emp_t = 0.f; B->shield_t = 3.f;
+        game_message(g, "CRANE - the vans burn out. He raises a riot shield."); g->message_t = 3.f;
+        pol_cue(g, SFX_KILL, 0.9f, 0.6f);
+    }
+    if (B->emp_cd > 0.f) B->emp_cd -= dt;
+    if (B->phase < 3) {
+        if (B->emp_t > 0.f) B->emp_t -= dt;
+        else { B->van_t -= dt; if (B->van_t <= 0.f) { B->van_t = 5.f; B->van_i = (B->van_i + 1) & 3; } }
+        Vec3 e = v3_sub(game_boss_emp_pos(g), p->pos); e.y = 0.f;
+        if (in && (in->pressed & BTN_USE) && v3_len(e) < 3.f) {
+            if (B->emp_cd <= 0.f) {
+                B->emp_t = 6.f; B->emp_cd = 12.f; B->emps++;
+                game_message(g, "EMP! The vans stall - he's exposed for 6 s."); g->message_t = 2.f;
+                pol_cue(g, SFX_SHUTTER, 1.0f, 0.5f);
+            } else { snprintf(g->message, sizeof g->message, "EMP node recharging (%.0f s)", B->emp_cd); g->message_t = 1.f; }
+        }
+    } else {
+        /* riot shield cycle: up 3 s, down 1.6 s (he fires) */
+        B->shield_t -= dt;
+        if (B->shield_t < -1.6f) B->shield_t = 3.f;
+    }
+    m->armor = game_boss_shielded(g) ? (B->phase < 3 ? 0.9f : 0.95f) : 0.f;
+}
+
 static void fraile_frame(Game *g, const PlatInput *in, float dt) {
     Bosses *B = &g->boss;
     Player *p = &g->player;
@@ -466,8 +545,8 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (g->mode != GM_PLAY) return;
     if (!B->active) {
         if (g->act != 0 || g->arena_active) return;
-        for (int w = 0; w < 4; w++) {
-            Vec3 d = v3_sub(w == 3 ? game_boss_tower_pos(g) : w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
+        for (int w = 0; w < 5; w++) {
+            Vec3 d = v3_sub(w == 4 ? game_boss_radio_pos(g) : w == 3 ? game_boss_tower_pos(g) : w == 2 ? game_boss_bell_pos(g) : w ? game_boss_clock_pos(g) : game_boss_drum_pos(g), g->player.pos); d.y = 0.f;
             if (v3_len(d) < 3.f) {
                 B->prompt_t = 0.2f; B->prompt_who = w;
                 if (in && (in->pressed & BTN_USE)) game_boss_start(g, w);
@@ -483,7 +562,7 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (p->health < p->health_max * 0.5f) B->clean = 0;
     if (player_is_down(p)) {
         boss_clear(g); B->losses++;
-        game_message(g, B->who == 3 ? "The bells fall silent over you. Pull the rope to try again." :
+        game_message(g, B->who == 4 ? "Processed. Use the call-box to try again." : B->who == 3 ? "The bells fall silent over you. Pull the rope to try again." :
                         B->who == 2 ? "The tide takes you. Ring the harbour bell to try again." :
                         B->who == 1 ? "The clock stops for you. Wind the dial to try again." :
                                       "The drums fade. Beat the war drum to try again."); g->message_t = 4.f;
@@ -493,6 +572,7 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
     if (B->who == 1) { reloj_frame(g, in, dt); return; }
     if (B->who == 2) { marea_frame(g, in, dt); return; }
     if (B->who == 3) { fraile_frame(g, in, dt); return; }
+    if (B->who == 4) { limp_frame(g, in, dt); return; }
 
     /* drummer deaths → stagger */
     for (int k = 0; k < 2; k++) {
@@ -555,6 +635,17 @@ static void boss_frame(Game *g, const PlatInput *in, float dt) {
 static void boss_draw_world(Game *g) {
     Bosses *B = &g->boss;
     B->drawn = 0;
+    if (B->active && B->who == 4) {
+        Vec3 n = game_boss_emp_pos(g);
+        Mat4 nm = m4_mul(m4_translate(v3(n.x, terrain_height(&g->terrain, n.x, n.z) + 0.6f, n.z)), m4_scale(v3(0.8f, 1.2f, 0.8f)));
+        rend_mesh_lit(g->mesh_box, &nm, -1, B->emp_cd > 0.f ? 0xFF404040u : 0xFFFFD040u, 1.f, 1, 1, 1, 0, 1); B->drawn++;
+        if (B->phase < 3) for (int k = 0; k < 2; k++) {
+            Vec3 v = game_boss_van_pos(g, k);
+            Mat4 vm = m4_mul(m4_translate(v3(v.x, terrain_height(&g->terrain, v.x, v.z) + 1.2f, v.z)), m4_scale(v3(2.2f, 2.4f, 5.0f)));
+            rend_mesh_lit(g->mesh_box, &vm, -1, B->emp_t > 0.f ? 0xFF606060u : 0xFFF0F0F0u, 1.f, 1, 1, 1, 0, 1); B->drawn++;
+        }
+        return;
+    }
     if (B->active && B->who == 3 && boss_alive(g, B->slot)) {
         const Enemy *e = &g->enemies.v[B->slot];
         for (int k = 0; k < 3; k++) {
@@ -632,7 +723,10 @@ static void boss_draw_hud(Game *g) {
     float ui = settings()->ui_scale, fs = 1.6f * ui;
     if (!B->active) {
         if (B->prompt_t > 0.f) {
-            const char *t = B->prompt_who == 3 ?
+            const char *t = B->prompt_who == 4 ?
+                            ((B->beaten & 16) ? "[E] CALL-BOX - rematch EL LIMPIADOR"
+                                              : "[E] CALL-BOX - summon EL LIMPIADOR") :
+                            B->prompt_who == 3 ?
                             ((B->beaten & 8) ? "[E] PULL THE BELL ROPE - rematch EL FRAILE"
                                              : "[E] PULL THE BELL ROPE - challenge EL FRAILE") :
                             B->prompt_who == 2 ?
@@ -652,13 +746,22 @@ static void boss_draw_hud(Game *g) {
     }
     float w = (float)g->w * 0.5f, x = (float)g->w * 0.25f, y = 34.f * ui;
     char b[96];
-    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 3 ? k_fraile_phase : B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
+    snprintf(b, sizeof b, "%s  -  %s", game_boss_name(B->who), (B->who == 4 ? k_limp_phase : B->who == 3 ? k_fraile_phase : B->who == 2 ? k_marea_phase : B->who == 1 ? k_reloj_phase : k_boss_phase)[B->phase]);
     font_text(x, y - 16.f * ui, fs, b, 0xFF60A0FF);
     rend_quad2d(x, y, w, 8.f * ui, -1, 0, 0, 1, 1, 0xC0101010);
     if (B->slot >= 0 && B->slot < g->enemies.count) {
         const Enemy *e = &g->enemies.v[B->slot];
         float f = e->health_max > 0.f ? e->health / e->health_max : 0.f;
         rend_quad2d(x, y, w * f, 8.f * ui, -1, 0, 0, 1, 1, 0xFF2030D0);
+    }
+    if (B->who == 4) {
+        if (B->phase < 3) {
+            if (B->emp_t > 0.f) snprintf(b, sizeof b, "VANS STALLED %.1fs - he's exposed!", B->emp_t);
+            else if (B->emp_cd > 0.f) snprintf(b, sizeof b, "Vans shield him - EMP recharging %.0fs", B->emp_cd);
+            else snprintf(b, sizeof b, "Vans shield him - [E] hack the EMP node (centre)");
+        } else snprintf(b, sizeof b, B->shield_t > 0.f ? "RIOT SHIELD UP - wait for the gap" : "SHIELD DOWN - FIRE!");
+        font_text(x, y + 11.f * ui, fs * 0.85f, b, game_boss_shielded(g) ? 0xFF4080FF : 0xFF40E0FF);
+        return;
     }
     if (B->who == 3) {
         if (B->kneel) snprintf(b, sizeof b, "HE KNEELS - [E] subdue (3 m) or strike him down");

@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
     char b[128];
     (void)kill_hunter; (void)last_head;
     CHECK(!strcmp(game_boss_name(1), "EL RELOJ"), "B2 is El Reloj");
-    CHECK(!game_boss_start(&g, 4), "unbuilt slots still refuse");
+    CHECK(!game_boss_start(&g, 5), "unbuilt slots still refuse");
 
     Vec3 cp = game_boss_clock_pos(&g);
     g.player.pos = v3(cp.x, cp.y, cp.z - 1.5f); g.player.vel = v3(0, 0, 0);

@@ -412,6 +412,8 @@ static void build_combat_arena(Game *g)
     prop_top_box(g, A.x - 24.f, h + 1.8f, A.z - 38.f, 0.5f, 0.6f, 0.5f, CONC, 0xFF20A0D0u);
     /* M17: El Fraile's bell rope - pull it (E) to call the B4 fight */
     prop_top_box(g, A.x + 24.f, h + 2.2f, A.z - 38.f, 0.12f, 1.2f, 0.12f, WOOD, 0xFF3070A0u);
+    /* M18: police call-box - pull to summon El Limpiador (B5) */
+    prop_top_box(g, A.x - 16.f, h + 0.8f, A.z - 46.f, 0.4f, 0.8f, 0.4f, WOOD, 0xFFA04020u);
     DH_INFO("game", "combat arena built at (%.0f,%.0f) deck %.1f m", A.x, A.z, h);
 }
 
