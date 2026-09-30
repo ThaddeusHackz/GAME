@@ -315,8 +315,10 @@ int game_save(Game *g, int slot, int is_auto) {
     s.outpost_count = 0;
     SaveOutpost *so = save_outpost(&s, ISLAND_OUTPOST_ID);
     if (so) { so->captured = pr->outpost_captured; so->alarm_level = pr->alarm_destroyed; }
-    for (int i = 0; i < CAMP_N; i++) {            /* M20 camps */
-        char cid[24]; snprintf(cid, sizeof cid, "camp_%02d", i);
+    for (int i = 0; i < CAMP_MAX; i++) {          /* M20 camps + M21 strongholds */
+        char cid[24];
+        if (i < CAMP_N) snprintf(cid, sizeof cid, "camp_%02d", i);
+        else snprintf(cid, sizeof cid, "stronghold_%d", i - CAMP_N + 1);
         SaveOutpost *sc = save_outpost(&s, cid);
         if (sc) sc->captured = (pr->camps_mask >> i) & 1u;
     }
@@ -373,8 +375,10 @@ int game_load(Game *g, int slot, int is_auto) {
     pr->outpost_captured = so ? so->captured : 0;
     pr->alarm_destroyed = so ? so->alarm_level : 0;
     pr->camps_mask = 0;
-    for (int i = 0; i < CAMP_N; i++) {
-        char cid[24]; snprintf(cid, sizeof cid, "camp_%02d", i);
+    for (int i = 0; i < CAMP_MAX; i++) {
+        char cid[24];
+        if (i < CAMP_N) snprintf(cid, sizeof cid, "camp_%02d", i);
+        else snprintf(cid, sizeof cid, "stronghold_%d", i - CAMP_N + 1);
         SaveOutpost *sc = save_outpost(&s, cid);
         if (sc && sc->captured == 1) pr->camps_mask |= 1u << i;
     }

@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
     for (int i = 1; i < g.camp_n; i++) {
         Camp *c = &g.camps[i];
         go(&g, v3(c->center.x, 0, c->center.z + 50.f)); run(&g, 20);
-        if (census(&g, c->center, NULL) != 3 + c->difficulty) {
+        if (census(&g, c->center, NULL) != (c->stages > 1 ? 4 : 3 + c->difficulty)) {
             all_streamed = 0; DH_WARN("smoke20", "camp %d streamed %d", i, census(&g, c->center, NULL));
         }
         if (g.enemies.count > maxc) maxc = g.enemies.count;

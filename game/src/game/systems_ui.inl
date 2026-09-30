@@ -93,7 +93,7 @@ static void draw_map_screen(Game *g) {
             int cx = dh_clampi((int)(c->center.x / (WORLD_SIZE / MAPW)), 0, MAPW - 1);
             int cz = dh_clampi((int)(c->center.z / (WORLD_SIZE / MAPW)), 0, MAPW - 1);
             if (g->fog[cz * MAPW + cx] || o->mast_synced)
-                MAP_ICON(c->center.x, c->center.z, c->captured ? C_JADE : C_RED, 7.f * ui);
+                MAP_ICON(c->center.x, c->center.z, c->captured ? C_JADE : C_RED, (c->stages > 1 ? 11.f : 7.f) * ui);
         }
     }
     for (int i = 0; i < g->econ.vendor_n; i++)

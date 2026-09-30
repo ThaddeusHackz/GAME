@@ -2,6 +2,8 @@
 
 
 
+## M21 — Strongholds: MOLINO FORTRESS, REFINERIA LA HERRERIA, FARO VIEJO; walled layouts with towers + signature keeps, 3 garrison waves (4/6/8, officer-led finale), 6 s flag hold, +500 cash / +6 stature / 12g cache, save ids stronghold_1..3, bigger map icons; ST2 relocated to Isla Sombra (deviation); suite 20 (1083 checks)
+
 ## M20 — Camp network: 11 liberation camps (outposts 2..12) with 3 layouts, streamed tagged garrisons (3+difficulty, pool slot reuse), clear + hold flag 3 s, rewards, map/minimap icons, save ids camp_00..camp_10; Isla Sombra k/12; suite 19 (1063 checks)
 
 ## M19 — El Sereno (finale, slot 5): lighthouse lantern needs all 5 lieutenants; P1 THE GATHERING (3 waves, -1 per wave if an outpost is liberated), P2 THE HOST (called cuts, T-parry 0.4 s -> 3 s stagger, "Good. Again."), P3 THE OFFERING ([E] Tobias / [T] ledger / 8 s silence for clean hero); feats THE LAST LIGHT + YOU WERE LISTENING (33); suite 18 (1038 checks)

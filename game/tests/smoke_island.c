@@ -619,7 +619,7 @@ static void test_integration_perf(Game *g) {
             g->prop_count, g->terrain.chunk_count, worst_world, worst_ship, worst_items,
             (double)settings()->foliage_density);
     /* M20: +11 camps (~150 authored props) raised the lean ceiling from 300 */
-    CHECK(g->prop_count < 480, "LOW preset foliage stays lean (%d props)", g->prop_count);
+    CHECK(g->prop_count < 540, "LOW preset foliage stays lean (%d props)", g->prop_count);
     CHECK(worst_world < 900, "LOW preset WORLD draw calls under the 900 budget (worst %d)",
           worst_world);
     CHECK(worst_ship < 900, "LOW preset SHIPPING frame (HUD on) under the 900 budget (worst %d)",

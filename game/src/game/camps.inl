@@ -24,13 +24,40 @@ static const struct { const char *name; int diff, theme; } CAMP_DEF[CAMP_N] = {
 #define CAMP_STREAM_IN  130.f
 #define CAMP_STREAM_OUT 230.f
 
-int game_camp_count(const Game *g) { return g ? g->camp_n : 0; }
-int game_camps_captured(const Game *g) {
-    int n = (g && g->outpost.captured) ? 1 : 0;
-    if (g) for (int i = 0; i < g->camp_n; i++) n += g->camps[i].captured;
+int game_camp_count(const Game *g) {
+    int n = 0;
+    if (g) for (int i = 0; i < g->camp_n; i++) n += g->camps[i].stages <= 1;
     return n;
 }
-int game_outposts_total(const Game *g) { return (g && g->outpost.built ? 1 : 0) + (g ? g->camp_n : 0); }
+int game_camps_captured(const Game *g) {
+    int n = (g && g->outpost.captured) ? 1 : 0;
+    if (g) for (int i = 0; i < g->camp_n; i++) n += g->camps[i].stages <= 1 && g->camps[i].captured;
+    return n;
+}
+int game_outposts_total(const Game *g) { return (g && g->outpost.built ? 1 : 0) + game_camp_count(g); }
+int game_stronghold_slot(const Game *g, int k) {
+    if (!g || k < 0 || k >= SH_N) return -1;
+    int s = CAMP_N + k;
+    return (s < g->camp_n && g->camps[s].stages > 1) ? s : -1;
+}
+int game_stronghold_count(const Game *g) {
+    int n = 0; for (int k = 0; k < SH_N; k++) n += game_stronghold_slot(g, k) >= 0; return n;
+}
+int game_strongholds_captured(const Game *g) {
+    int n = 0;
+    for (int k = 0; k < SH_N; k++) { int s = game_stronghold_slot(g, k); if (s >= 0) n += g->camps[s].captured; }
+    return n;
+}
+
+/* M21 — the three strongholds (§73 ST1-ST3). Multi-stage: three garrison
+   waves, each must be cleared before the next marches in, then a 6 s hold.
+   HONEST DEVIATION: ST2 "Refinería La Herrería" is specced for Meridian City,
+   but the city plate has no free lot outside the block grid, so it stands on
+   Isla Sombra as the cartel's island refinery. Logged in M21_report.md. */
+static const struct { const char *name; int diff; } SH_DEF[SH_N] = {
+    { "MOLINO FORTRESS", 4 }, { "REFINERIA LA HERRERIA", 5 }, { "FARO VIEJO", 5 },
+};
+static int camp_hold_s(const Camp *c) { return c->stages > 1 ? 6 : 3; }
 
 static int camps_veg_excluded(Game *g, float x, float z) {
     for (int i = 0; i < g->camp_n; i++)
@@ -107,6 +134,42 @@ static void camp_build_one(Game *g, Camp *c) {
     prop_top_box(g, c->flag_pos.x, P + 6.f, c->flag_pos.z, 0.08f, 3.f, 0.08f, MET, 0xFFB0B4B8u);
 }
 
+static void stronghold_build_one(Game *g, Camp *c, int k) {
+    const Vec3 C = c->center; const float P = c->pad_h;
+    const int WOOD = proc_tex.wood, CONC = proc_tex.concrete, MET = proc_tex.metal;
+    const uint32_t WALL = 0xFF8C9CA8u, WOODC = 0xFFC0D0E0u;
+    /* 2.4 m curtain walls (vault-able from crates) with a south gate */
+    prop_top_box(g, C.x - 8.5f, P + 2.4f, C.z + CAMP_R, 5.5f, 1.2f, 0.5f, CONC, WALL);
+    prop_top_box(g, C.x + 8.5f, P + 2.4f, C.z + CAMP_R, 5.5f, 1.2f, 0.5f, CONC, WALL);
+    prop_top_box(g, C.x, P + 2.4f, C.z - CAMP_R, CAMP_R, 1.2f, 0.5f, CONC, WALL);
+    prop_top_box(g, C.x - CAMP_R, P + 2.4f, C.z, 0.5f, 1.2f, CAMP_R, CONC, WALL);
+    prop_top_box(g, C.x + CAMP_R, P + 2.4f, C.z, 0.5f, 1.2f, CAMP_R, CONC, WALL);
+    /* crate steps inside + outside the gate so walls are climbable (M1 verbs) */
+    prop_top_box(g, C.x - 4.f, P + 1.1f, C.z + CAMP_R + 1.4f, 0.8f, 0.55f, 0.8f, WOOD, WOODC);
+    prop_top_box(g, C.x + 4.f, P + 1.1f, C.z + CAMP_R - 1.4f, 0.8f, 0.55f, 0.8f, WOOD, WOODC);
+    /* two corner towers (deck 5 m) */
+    for (int t = 0; t < 2; t++) {
+        float tx = C.x + (t ? CAMP_R - 2.f : -CAMP_R + 2.f), tz = C.z - CAMP_R + 2.f;
+        prop_top_box(g, tx, P + 5.f, tz, 1.4f, 2.5f, 1.4f, CONC, WALL);
+    }
+    /* signature keep per stronghold */
+    if (k == 0) {        /* mill: chimney + press house */
+        prop_top_box(g, C.x - 5.f, P + 3.f, C.z - 5.f, 4.f, 1.5f, 3.f, CONC, 0xFF6A7A9Au);
+        prop_top_box(g, C.x - 9.f, P + 14.f, C.z - 9.f, 1.1f, 7.f, 1.1f, CONC, 0xFF5A6A8Au);
+    } else if (k == 1) { /* refinery: tanks + pipe rack */
+        prop_top_box(g, C.x - 6.f, P + 4.f, C.z - 6.f, 2.2f, 2.f, 2.2f, MET, 0xFF7A8A8Au);
+        prop_top_box(g, C.x - 1.f, P + 4.f, C.z - 6.f, 2.2f, 2.f, 2.2f, MET, 0xFF7A8A8Au);
+        prop_top_box(g, C.x + 5.f, P + 3.2f, C.z - 4.f, 4.f, 0.2f, 0.4f, MET, 0xFF4E5A64u);
+    } else {             /* lighthouse: white tower with a lamp room */
+        prop_top_box(g, C.x - 6.f, P + 16.f, C.z - 6.f, 1.8f, 8.f, 1.8f, CONC, 0xFFE8ECF0u);
+        prop_top_box(g, C.x - 6.f, P + 17.4f, C.z - 6.f, 2.1f, 0.7f, 2.1f, MET, 0xFF40C0F0u);
+    }
+    prop_top_box(g, C.x + 6.f, P + 1.2f, C.z + 5.f, 0.8f, 0.6f, 0.8f, WOOD, WOODC);
+    prop_top_box(g, C.x - 3.f, P + 1.2f, C.z + 7.f, 0.8f, 0.6f, 0.8f, WOOD, WOODC);
+    c->flag_pos = v3(C.x + 4.f, P, C.z);
+    prop_top_box(g, c->flag_pos.x, P + 7.f, c->flag_pos.z, 0.1f, 3.5f, 0.1f, MET, 0xFFB0B4B8u);
+}
+
 /* called from build_island after the mast, BEFORE vegetation + chunk meshing */
 static void camps_build(Game *g) {
     memset(g->camps, 0, sizeof g->camps);
@@ -128,6 +191,7 @@ static void camps_build(Game *g) {
                     dh_strcpy_safe(c->name, sizeof c->name, CAMP_DEF[i].name);
                     c->difficulty = CAMP_DEF[i].diff;
                     c->theme = CAMP_DEF[i].theme;
+                    c->stages = 1;
                     c->pad_h = h;
                     c->center = v3(x, h, z);
                     terrain_flatten(&g->terrain, c->center, CAMP_R + 2.f, CAMP_R + 2.f, h, 8.f);
@@ -139,6 +203,27 @@ static void camps_build(Game *g) {
         }
     if (g->camp_n < CAMP_N)
         DH_WARN("game", "camps: only %d/%d sites found (terrain seed)", g->camp_n, CAMP_N);
+    /* strongholds only index cleanly when all camps exist (slot = CAMP_N + k) */
+    for (int k = 0; k < SH_N && g->camp_n == CAMP_N + k; k++) {
+        int found = 0;
+        for (float z = 60.f; z < 940.f && !found; z += 20.f)
+            for (float x = 60.f; x < 940.f && !found; x += 20.f) {
+                /* spread: ST1 west, ST2 centre, ST3 east (lighthouse on the coast side) */
+                float band0 = 60.f + k * 293.f;
+                if (x < band0 || x > band0 + 293.f) continue;
+                float h;
+                if (!camp_site_ok(g, x, z, &h)) continue;
+                Camp *c = &g->camps[g->camp_n++];
+                snprintf(c->id, sizeof c->id, "stronghold_%d", k + 1);
+                dh_strcpy_safe(c->name, sizeof c->name, SH_DEF[k].name);
+                c->difficulty = SH_DEF[k].diff; c->theme = 3; c->stages = 3;
+                c->pad_h = h; c->center = v3(x, h, z);
+                terrain_flatten(&g->terrain, c->center, CAMP_R + 2.f, CAMP_R + 2.f, h, 8.f);
+                stronghold_build_one(g, c, k);
+                found = 1;
+            }
+        if (!found) DH_WARN("game", "stronghold %d: no site found", k + 1);
+    }
     DH_INFO("game", "camps: %d built, props now %d", g->camp_n, g->prop_count);
 }
 
@@ -176,13 +261,14 @@ static int camp_slot_spawn(Game *g, Vec3 pos, int arch, Vec3 pa, Vec3 pb, int ta
 }
 
 static void camp_spawn(Game *g, Camp *c) {
-    int n = 3 + c->difficulty;
+    int n = c->stages > 1 ? 4 + 2 * c->stage : 3 + c->difficulty;   /* ST waves 4/6/8 */
+    if (n > 8) n = 8;
     int ci = (int)(c - g->camps), got = 0;
     const Vec3 C = c->center; const float P = c->pad_h;
     static const float px[8] = { -3.f, 3.f, 0.f, -9.f, 9.f, -6.f, 5.f, 0.f };
     static const float pz[8] = { 12.f, 12.f, 2.f, 0.f, -4.f, -4.f, 6.f, -10.f };
     for (int k = 0; k < n; k++) {
-        int arch = (k == n - 1 && c->difficulty >= 3) ? EN_OFFICER
+        int arch = (k == n - 1 && (c->difficulty >= 3 || c->stage == 2)) ? EN_OFFICER
                  : (k % 3 == 2) ? EN_BRUISER : EN_GRUNT;
         Vec3 pos = v3(C.x + px[k], P, C.z + pz[k]);
         if (c->theme == 1 && k == 2) pos = v3(C.x - 8.f, P + 4.8f, C.z - 8.f);   /* tower sentry */
@@ -223,7 +309,14 @@ static void camps_frame(Game *g, float dt) {
             if (e->state == EN_DEAD) dead++; else alive++;
         }
         if (!c->cleared) {
-            if (c->spawned && alive == 0 && dead > 0) {
+            if (c->spawned && alive == 0 && dead > 0 && c->stage < c->stages - 1) {
+                /* stronghold: next wave marches in; release this wave's corpses */
+                c->stage++; c->spawned = 0;
+                for (int k = 0; k < g->enemies.count; k++)
+                    if (g->enemies.v[k].faction == CAMP_FACTION && g->enemies.v[k].tag == 100 + i)
+                        g->enemies.v[k].tag = 0;
+                game_message(g, "%s - wave %d/%d incoming", c->name, c->stage + 1, c->stages);
+            } else if (c->spawned && alive == 0 && dead > 0) {
                 c->cleared = 1;
                 game_message(g, "%s garrison down - hold the flag", c->name);
             } else if (c->spawned && alive == 0 && dead == 0) {
@@ -244,17 +337,26 @@ static void camps_frame(Game *g, float dt) {
         /* cleared: hold the flag */
         if (v3_dist_xz(p->pos, c->flag_pos) < 7.f && p->health > 0.f) {
             c->capture_t += dt;
-            if (c->capture_t >= 3.f) {
+            if (c->capture_t >= (float)camp_hold_s(c)) {
                 c->captured = 1;
                 g->prog.camps_mask |= 1u << i;
-                sys_xp(g, EV_OUTPOST_STEALTH);
-                game_stature_add(g, 3.f);
-                g->cash += 40 + 20 * c->difficulty;
+                int sh = c->stages > 1;
+                sys_xp(g, sh ? EV_OUTPOST_LOUD : EV_OUTPOST_STEALTH);
+                game_stature_add(g, sh ? 6.f : 3.f);
+                g->cash += sh ? 500 : 40 + 20 * c->difficulty;
+                if (sh) {
+                    pickup_add(g, v3(c->flag_pos.x, c->pad_h + 0.4f, c->flag_pos.z + 2.f), PK_AMMO, AMMO_12G, 24.f);
+                    game_message(g, "%s FALLS - strongholds %d/%d", c->name,
+                                 game_strongholds_captured(g), game_stronghold_count(g));
+                    g->message_t = 7.f;
+                }
                 pickup_add(g, v3(c->flag_pos.x - 2.f, c->pad_h + 0.4f, c->flag_pos.z), PK_HEALTH, 0, 40.f);
                 pickup_add(g, v3(c->flag_pos.x + 2.f, c->pad_h + 0.4f, c->flag_pos.z), PK_AMMO, AMMO_556, 60.f);
-                game_message(g, "%s LIBERATED - Isla Sombra %d/%d", c->name,
-                             game_camps_captured(g), game_outposts_total(g));
-                g->message_t = 6.f;
+                if (!sh) {
+                    game_message(g, "%s LIBERATED - Isla Sombra %d/%d", c->name,
+                                 game_camps_captured(g), game_outposts_total(g));
+                    g->message_t = 6.f;
+                }
                 DH_INFO("game", "camp captured: %s", c->name);
             }
         } else if (c->capture_t > 0.f) {
@@ -270,7 +372,7 @@ static void camps_draw(Game *g) {
         const Camp *c = &g->camps[i];
         Vec3 fp = c->flag_pos;
         if (!rend_should_draw(&fp, 6.f)) continue;
-        float fy = fp.y + 1.3f + c->flag_raise * 4.f;
+        float fy = fp.y + 1.3f + c->flag_raise * (c->stages > 1 ? 5.f : 4.f);
         float wave = sinf(g->time * 3.f + (float)i) * 0.06f;
         Mat4 m = m4_mul(m4_translate(v3(fp.x + 0.7f, fy + wave, fp.z)),
                         m4_scale(v3(1.4f, 0.46f, 0.03f)));

@@ -127,6 +127,8 @@ typedef struct {
    (no alarm box / waves) but real: authored layout, streamed garrison,
    clear + hold the flag to liberate, persisted in saves. */
 #define CAMP_N        11
+#define SH_N          3            /* M21 strongholds (entries CAMP_N..) */
+#define CAMP_MAX      (CAMP_N + SH_N)
 #define CAMP_FACTION  6
 typedef struct {
     char  id[24];
@@ -136,6 +138,7 @@ typedef struct {
     Vec3  center, flag_pos;
     float pad_h;
     int   spawned, cleared, captured;
+    int   stages, stage;           /* 1 for camps · 3 for strongholds */
     float capture_t, flag_raise;
 } Camp;
 
@@ -271,7 +274,7 @@ typedef struct Game {
 
     /* ── island content (M3) ── */
     Outpost      outpost;                 /* vertical-slice capture outpost */
-    Camp         camps[CAMP_N];           /* M20: outposts 2..12 */
+    Camp         camps[CAMP_MAX];         /* M20 outposts 2..12 + M21 strongholds */
     int          camp_n;
     Critter      critters[CRITTER_MAX];   /* ambient wildlife (2 species) */
     int          critter_count;
@@ -344,6 +347,10 @@ int   game_camps_captured(const Game *g);       /* includes Punta Quemada */
 int   game_outposts_total(const Game *g);
 Vec3  game_camp_flag(const Game *g, int i);
 int   game_camp_state(const Game *g, int i);    /* 0 hostile · 1 cleared · 2 liberated */
+/* M21 strongholds: index 0..2 → camps[CAMP_N + k] */
+int   game_stronghold_count(const Game *g);
+int   game_strongholds_captured(const Game *g);
+int   game_stronghold_slot(const Game *g, int k);  /* camps[] index or -1 */
 /* Day/night (Spec 6.7): day_t ∈ [0,1), 0 = 06:00, 0.25 = noon, 0.75 = midnight.
    day_palette is pure (unit-testable); game_set_time applies it to the world. */
 void  day_palette(float day_t, SceneLight *L);

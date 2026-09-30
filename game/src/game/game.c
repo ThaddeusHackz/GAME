@@ -2470,7 +2470,7 @@ static void draw_minimap(Game *g) {
             int cx = dh_clampi((int)(c->center.x / cell), 0, MAPW - 1);
             int cz = dh_clampi((int)(c->center.z / cell), 0, MAPW - 1);
             if (o->mast_synced || g->fog[cz * MAPW + cx] >= 1)
-                MM_ICON(c->center.x, c->center.z, c->captured ? C_JADE : C_RED, 4.0f * ui);
+                MM_ICON(c->center.x, c->center.z, c->captured ? C_JADE : C_RED, (c->stages > 1 ? 6.0f : 4.0f) * ui);
         }
         int mcx = dh_clampi((int)(o->mast_pos.x / cell), 0, MAPW - 1);
         int mcz = dh_clampi((int)(o->mast_pos.z / cell), 0, MAPW - 1);
