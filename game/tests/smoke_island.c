@@ -618,7 +618,8 @@ static void test_integration_perf(Game *g) {
     DH_INFO("smoke3", "LOW perf: prop_count=%d chunk_count=%d world_draws=%d ship_draws=%d items=%d foliage=%.2f",
             g->prop_count, g->terrain.chunk_count, worst_world, worst_ship, worst_items,
             (double)settings()->foliage_density);
-    CHECK(g->prop_count < 300, "LOW preset foliage stays lean (%d props)", g->prop_count);
+    /* M20: +11 camps (~150 authored props) raised the lean ceiling from 300 */
+    CHECK(g->prop_count < 480, "LOW preset foliage stays lean (%d props)", g->prop_count);
     CHECK(worst_world < 900, "LOW preset WORLD draw calls under the 900 budget (worst %d)",
           worst_world);
     CHECK(worst_ship < 900, "LOW preset SHIPPING frame (HUD on) under the 900 budget (worst %d)",

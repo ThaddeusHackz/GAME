@@ -126,6 +126,7 @@ void game_island_store(Game *g) {
 
 static void sys_island_restore(Game *g) {
     Progress *pr = &g->prog;
+    camps_restore(g);
     if (!pr->island_saved) return;
     Outpost *o = &g->outpost;
     if (pr->outpost_captured && o->built) {
@@ -314,6 +315,11 @@ int game_save(Game *g, int slot, int is_auto) {
     s.outpost_count = 0;
     SaveOutpost *so = save_outpost(&s, ISLAND_OUTPOST_ID);
     if (so) { so->captured = pr->outpost_captured; so->alarm_level = pr->alarm_destroyed; }
+    for (int i = 0; i < CAMP_N; i++) {            /* M20 camps */
+        char cid[24]; snprintf(cid, sizeof cid, "camp_%02d", i);
+        SaveOutpost *sc = save_outpost(&s, cid);
+        if (sc) sc->captured = (pr->camps_mask >> i) & 1u;
+    }
     s.flag_count = 0;
     save_set_flag(&s, "island_saved", pr->island_saved);
     save_set_flag(&s, "mast_synced", pr->mast_synced);
@@ -366,6 +372,12 @@ int game_load(Game *g, int slot, int is_auto) {
     SaveOutpost *so = save_outpost(&s, ISLAND_OUTPOST_ID);
     pr->outpost_captured = so ? so->captured : 0;
     pr->alarm_destroyed = so ? so->alarm_level : 0;
+    pr->camps_mask = 0;
+    for (int i = 0; i < CAMP_N; i++) {
+        char cid[24]; snprintf(cid, sizeof cid, "camp_%02d", i);
+        SaveOutpost *sc = save_outpost(&s, cid);
+        if (sc && sc->captured == 1) pr->camps_mask |= 1u << i;
+    }
     pr->mast_synced = save_get_flag(&s, "mast_synced", 0);
     pr->island_saved = save_get_flag(&s, "island_saved", 0);
     pr->money_earned = (int)s.stats.money_earned;

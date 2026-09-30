@@ -28,6 +28,7 @@ typedef struct {
     /* identity */
     int   arch;             /* EnemyArch */
     int   faction;          /* 0 = cult (fights to death) */
+    int   tag;              /* owner tag (M20 camps: 100 + camp index), 0 = none */
     float health, health_max;
 
     /* fsm */

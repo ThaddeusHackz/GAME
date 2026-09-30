@@ -88,6 +88,13 @@ static void draw_map_screen(Game *g) {
         int ocz = dh_clampi((int)(o->center.z / (WORLD_SIZE / MAPW)), 0, MAPW - 1);
         if (g->fog[ocz * MAPW + ocx]) MAP_ICON(o->center.x, o->center.z, o->captured ? C_JADE : C_RED, 9.f * ui);
         if (o->mast_synced) MAP_ICON(o->mast_pos.x, o->mast_pos.z, C_JADE, 6.f * ui);
+        for (int ci = 0; ci < g->camp_n; ci++) {             /* M20 camps */
+            const Camp *c = &g->camps[ci];
+            int cx = dh_clampi((int)(c->center.x / (WORLD_SIZE / MAPW)), 0, MAPW - 1);
+            int cz = dh_clampi((int)(c->center.z / (WORLD_SIZE / MAPW)), 0, MAPW - 1);
+            if (g->fog[cz * MAPW + cx] || o->mast_synced)
+                MAP_ICON(c->center.x, c->center.z, c->captured ? C_JADE : C_RED, 7.f * ui);
+        }
     }
     for (int i = 0; i < g->econ.vendor_n; i++)
         if (g->econ.vendors[i].act == g->act)

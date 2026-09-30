@@ -120,6 +120,7 @@ typedef struct {
     /* island state carried over the ferry / into saves */
     int      island_saved;
     int      outpost_captured, mast_synced, alarm_destroyed;
+    uint32_t camps_mask;                   /* M20: liberated camps (bit i) */
     uint32_t fog_bits[64 * 64 / 32];
     int      city_stars;                   /* wanted persistence */
     float    last_stand_cd;

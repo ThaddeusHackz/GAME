@@ -24,7 +24,7 @@
 #include "../meta/progress.h"
 #include "../meta/mission.h"
 
-#define GAME_MAX_PROPS 640
+#define GAME_MAX_PROPS 960
 
 typedef enum { GM_MENU = 0, GM_PLAY, GM_PAUSE, GM_PHOTO } GameMode;
 typedef enum { UI_NONE = 0, UI_MAP, UI_CHAR, UI_SHOP, UI_CARD, UI_HERALD, UI_FEATS } GameUi;
@@ -122,6 +122,22 @@ typedef struct {
     GarrisonSlot garrison[GARRISON_MAX];
     int   garrison_n;
 } Outpost;
+
+/* M20: the other eleven liberation camps (§28). Lighter than Punta Quemada
+   (no alarm box / waves) but real: authored layout, streamed garrison,
+   clear + hold the flag to liberate, persisted in saves. */
+#define CAMP_N        11
+#define CAMP_FACTION  6
+typedef struct {
+    char  id[24];
+    char  name[28];
+    int   difficulty;            /* 1..5 → garrison 3+d */
+    int   theme;                 /* 0 tent · 1 tower · 2 bunker */
+    Vec3  center, flag_pos;
+    float pad_h;
+    int   spawned, cleared, captured;
+    float capture_t, flag_raise;
+} Camp;
 
 /* Ambient wildlife (§4.2: two island species in the vertical slice).
    0 = venado (deer) · 1 = jabalí (boar). Graze → alert → flee FSM. */
@@ -255,6 +271,8 @@ typedef struct Game {
 
     /* ── island content (M3) ── */
     Outpost      outpost;                 /* vertical-slice capture outpost */
+    Camp         camps[CAMP_N];           /* M20: outposts 2..12 */
+    int          camp_n;
     Critter      critters[CRITTER_MAX];   /* ambient wildlife (2 species) */
     int          critter_count;
     uint8_t      fog[MAPW * MAPW];        /* 0 unexplored · 1 seen · 2 synced */
@@ -320,6 +338,12 @@ float pol_diff_damage_pub(void);          /* M7: difficulty damage multiplier */
    of the outpost, grants the loadout, and seeds the garrison — the DoD path
    (scout → plan → capture three ways) runs from there. */
 void  game_outpost_start(Game *g);
+/* M20 camp network (outposts 2..12) */
+int   game_camp_count(const Game *g);
+int   game_camps_captured(const Game *g);       /* includes Punta Quemada */
+int   game_outposts_total(const Game *g);
+Vec3  game_camp_flag(const Game *g, int i);
+int   game_camp_state(const Game *g, int i);    /* 0 hostile · 1 cleared · 2 liberated */
 /* Day/night (Spec 6.7): day_t ∈ [0,1), 0 = 06:00, 0.25 = noon, 0.75 = midnight.
    day_palette is pure (unit-testable); game_set_time applies it to the world. */
 void  day_palette(float day_t, SceneLight *L);

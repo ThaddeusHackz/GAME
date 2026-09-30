@@ -447,6 +447,13 @@ static void prop_visual(Game *g, Vec3 center, Vec3 half, int tex, uint32_t color
     d->radius = v3_len(half);
 }
 
+/* M20 camps (camps.inl) */
+static int  camps_veg_excluded(Game *g, float x, float z);
+static void camps_build(Game *g);
+static void camps_restore(Game *g);
+static void camps_frame(Game *g, float dt);
+static void camps_draw(Game *g);
+
 /* Is (x,z) inside a reserved flat site? Keeps jungle off the pads. */
 static int veg_excluded(Game *g, float x, float z) {
     if (fabsf(x - g->course_center.x) < 92.f && fabsf(z - g->course_center.z) < 76.f) return 1;
@@ -460,6 +467,7 @@ static int veg_excluded(Game *g, float x, float z) {
     if (g->outpost.built &&
         fabsf(x - g->outpost.mast_pos.x) < 12.f &&
         fabsf(z - g->outpost.mast_pos.z) < 12.f) return 1;
+    if (camps_veg_excluded(g, x, z)) return 1;
     return 0;
 }
 
@@ -806,6 +814,8 @@ static void build_island(Game *g) {
     memset(g->fog, 0, sizeof g->fog);
     build_outpost(g);
     build_signal_mast(g);
+    camps_build(g);
+    camps_restore(g);
     build_vegetation(g);
     spawn_wildlife(g);
     build_minimap_cache(g);
@@ -1425,7 +1435,8 @@ static void island_update(Game *g, const PlatInput *in, float dt) {
                 sys_xp(g, o->alarm ? EV_OUTPOST_LOUD : EV_OUTPOST_STEALTH);
                 g->prog.ft_unlocked[FT_OUTPOST] = 1;
                 g->prog.ft[FT_OUTPOST].pos = o->flag_pos;
-                game_message(g, "%s LIBERATED - Isla Sombra 1/1. Supplies dropped.", o->name);
+                game_message(g, "%s LIBERATED - Isla Sombra %d/%d. Supplies dropped.", o->name,
+                             game_camps_captured(g), game_outposts_total(g));
                 g->message_t = 6.f;
                 pickup_add(g, v3(o->flag_pos.x - 2.f, o->pad_h + 0.4f, o->flag_pos.z),
                            PK_HEALTH, 0, 40.f);
@@ -2276,6 +2287,7 @@ static void game_frame_inner(Game *g, const PlatInput *in, float dt) {
     feats_frame(g, dt);                      /* M12 feats */
     cob_frame(g, dt);                        /* M13 bounty squad */
     boss_frame(g, in, dt);                     /* M14 bosses */
+    camps_frame(g, dt);                        /* M20 camp network */
 
     /* ── photo mode / debug toggles ── */
     if ((in->pressed & BTN_PHOTO) && game_photo_enter(g)) {
@@ -2453,6 +2465,13 @@ static void draw_minimap(Game *g) {
         int outpost_known = o->mast_synced || g->fog[ocz * MAPW + ocx] >= 1;
         if (outpost_known)
             MM_ICON(o->center.x, o->center.z, o->captured ? C_JADE : C_RED, 5.0f * ui);
+        for (int ci = 0; ci < g->camp_n && g->act == 0; ci++) {   /* M20 camps */
+            const Camp *c = &g->camps[ci];
+            int cx = dh_clampi((int)(c->center.x / cell), 0, MAPW - 1);
+            int cz = dh_clampi((int)(c->center.z / cell), 0, MAPW - 1);
+            if (o->mast_synced || g->fog[cz * MAPW + cx] >= 1)
+                MM_ICON(c->center.x, c->center.z, c->captured ? C_JADE : C_RED, 4.0f * ui);
+        }
         int mcx = dh_clampi((int)(o->mast_pos.x / cell), 0, MAPW - 1);
         int mcz = dh_clampi((int)(o->mast_pos.z / cell), 0, MAPW - 1);
         if (o->mast_synced || g->fog[mcz * MAPW + mcx] >= 1)
@@ -2507,6 +2526,7 @@ static void draw_minimap(Game *g) {
 #include "feats.inl"        /* M12 feats poster */
 #include "cobradores.inl"   /* M13 bounty squad */
 #include "boss.inl"         /* M14 bosses */
+#include "camps.inl"        /* M20 outposts 2..12 */
 
 static void draw_hud(Game *g) {
     Settings *s = settings();
@@ -2547,7 +2567,7 @@ static void draw_hud(Game *g) {
             if (g->enemies.v[i].faction == 2 && g->enemies.v[i].state != EN_DEAD) alive++;
         uint32_t oc = o->captured ? C_JADE : (o->alarm ? C_RED : C_GOLD);
         if (o->captured)
-            snprintf(buf, sizeof(buf), "%s  LIBERATED  /  ISLA SOMBRA 1/1", o->name);
+            snprintf(buf, sizeof(buf), "%s  LIBERATED  /  ISLA SOMBRA %d/%d", o->name, game_camps_captured(g), game_outposts_total(g));
         else
             snprintf(buf, sizeof(buf), "%s  /  %d HOSTILES%s%s", o->name, alive,
                      o->alarm ? "  /  " : "", o->alarm ? "ALARM RAISED" : "");
@@ -2845,6 +2865,7 @@ void game_render(Game *g) {
     if (g->act == 0) {
         draw_critters(g);
         draw_outpost_flag(g);
+        camps_draw(g);
     }
     draw_poncho(g);
     draw_pickups(g);
