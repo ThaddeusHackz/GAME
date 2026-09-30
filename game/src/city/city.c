@@ -121,7 +121,7 @@ void city_init(City *c, struct Game *g) {
 
     /* ── parked cars (8, curbside; one Sirena so the +2★ steal is playable) ── */
     {
-        struct { const char *id; float x, z, yaw; } P[8] = {
+        struct { const char *id; float x, z, yaw; } P[12] = {
             {"V01", 389.5f, 420.0f, 0.0f},
             {"V02", 389.5f, 545.0f, 0.0f},
             {"V05", 509.5f, 420.0f, 0.0f},
@@ -130,8 +130,14 @@ void city_init(City *c, struct Game *g) {
             {"V05", 610.5f, 580.0f, CITY_PI},
             {"V06", 490.5f, 512.0f, CITY_PI},   /* cruiser by the hot-dog corner */
             {"V02", 442.0f, 629.5f, CITY_PI * 0.5f},
+            /* M22: van + pickup curbside, Limpio armored van at the harbor lot,
+               a cult buggy the Cosecha smuggled across (steal-only classes) */
+            {"V03", 389.5f, 470.0f, 0.0f},
+            {"V04", 610.5f, 520.0f, CITY_PI},
+            {"V11", 509.5f, 470.0f, 0.0f},
+            {"V12", 558.0f, 629.5f, CITY_PI * 0.5f},
         };
-        for (int i = 0; i < 8 && c->veh_count < VEHICLES_MAX; i++) {
+        for (int i = 0; i < 12 && c->veh_count < VEHICLES_MAX; i++) {
             Vehicle *v = &c->veh[c->veh_count++];
             memset(v, 0, sizeof *v);
             v->def = def_find(c, P[i].id);
@@ -494,7 +500,8 @@ static void chase_spawn(City *c, struct Game *g) {
     int vi = -1;
     /* reuse a deactivated cruiser far from the player, else append */
     for (int i = c->chase0; i < c->veh_count; i++) {
-        if (c->veh[i].state == VS_PARKED && c->veh[i].def == def_find(c, "V06") &&
+        if (c->veh[i].state == VS_PARKED &&
+            (c->veh[i].def == def_find(c, "V06") || c->veh[i].def == def_find(c, "V11")) &&
             dist2d(c->veh[i].pos, g->player.pos) > 130.0f) { vi = i; break; }
     }
     if (vi < 0) {
@@ -511,7 +518,9 @@ static void chase_spawn(City *c, struct Game *g) {
     v->pos = sp;
     v->yaw = (sp.z < 500.0f) ? 0.0f : CITY_PI;
     v->speed = 8.0f;
-    v->damage = (c->heat.stars >= 5) ? -1200.0f : 0.0f;  /* 5★: armored cruisers */
+    /* M22 (§6.5/§69): from 4★ every other response vehicle is a Limpio Obelisco */
+    v->def = (c->heat.stars >= 4 && (next_spawn & 1)) ? def_find(c, "V11") : def_find(c, "V06");
+    v->damage = (c->heat.stars >= 5 && c->defs[v->def].cls == VC_POLICE) ? -1200.0f : 0.0f;
     v->slip = 0.0f;
     v->state = VS_CHASE;
     v->panic_t = 0.0f;
@@ -794,7 +803,8 @@ static void draw_vehicle(City *c, struct Game *g, const Vehicle *v, int idx) {
     int wreck = (v->state == VS_WRECK);
     uint32_t col;
     if (wreck) col = 0xFF262626u;
-    else if (d->cls == VC_POLICE) col = 0xFFEEEAE0u;
+    else if (d->cls == VC_POLICE || d->cls == VC_ARMORED) col = 0xFFEEEAE0u;
+    else if (d->cls == VC_BUGGY) col = 0xFF3C78A8u;   /* cult ochre */
     else col = CIVIL_COL[idx % 6];
 
     Mat4 body = m4_trs(v3(v->pos.x, v->pos.y + d->height * 0.45f, v->pos.z),
@@ -807,7 +817,13 @@ static void draw_vehicle(City *c, struct Game *g, const Vehicle *v, int idx) {
                           v3(d->width * 0.78f, d->height * 0.5f, d->length * 0.52f));
         rend_mesh_lit(g->mesh_box, &cab, -1, 0xFF2A2E33u, 1.0f, 1, 1, 1, 0, 0);
     }
-    if (d->cls == VC_POLICE && !wreck) {
+    if (d->cls == VC_PICKUP && !wreck) {   /* open bed: lower rear box */
+        Mat4 bed = m4_trs(v3(v->pos.x - sinf(v->yaw) * d->length * 0.28f, v->pos.y + d->height * 0.7f,
+                             v->pos.z - cosf(v->yaw) * d->length * 0.28f), v->yaw, 0, 0,
+                          v3(d->width * 0.9f, 0.25f, d->length * 0.4f));
+        rend_mesh_lit(g->mesh_box, &bed, -1, 0xFF30343Au, 1.0f, 1, 1, 1, 0, 0);
+    }
+    if ((d->cls == VC_POLICE || d->cls == VC_ARMORED) && !wreck) {
         int phase = ((int)(g->time * 5.0f) + idx) % 2;
         Vec3 lp = v3(v->pos.x, v->pos.y + d->height * 1.22f, v->pos.z);
         Mat4 l1 = m4_trs(v3(lp.x + 0.3f, lp.y, lp.z), v->yaw, 0, 0, v3(0.3f, 0.16f, 0.3f));

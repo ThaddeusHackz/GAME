@@ -6,6 +6,10 @@
     { "id": "V02", "name": "Tiburon GT",   "cls": "muscle",   "top_kmh": 195, "accel_0_100_s": 5.2, "grip": 0.70, "hp": 550,  "seats": 2, "price": 18000, "radio": true },
     { "id": "V05", "name": "Guagua",       "cls": "taxi",     "top_kmh": 135, "accel_0_100_s": 9.0, "grip": 0.82, "hp": 500,  "seats": 4, "price": 4000,  "radio": true },
     { "id": "V06", "name": "Sirena",       "cls": "police",   "top_kmh": 180, "accel_0_100_s": 6.0, "grip": 0.85, "hp": 800,  "seats": 4, "price": 0,     "radio": true, "steal_heat": 2 },
-    { "id": "V07", "name": "Fenix",        "cls": "motorcycle","top_kmh": 205, "accel_0_100_s": 4.2, "grip": 0.90, "hp": 300, "seats": 2, "price": 9500,  "radio": false }
+    { "id": "V07", "name": "Fenix",        "cls": "motorcycle","top_kmh": 205, "accel_0_100_s": 4.2, "grip": 0.90, "hp": 300, "seats": 2, "price": 9500,  "radio": false },
+    { "id": "V03", "name": "Almuden",      "cls": "van",      "top_kmh": 120, "accel_0_100_s": 11.0,"grip": 0.75, "hp": 700,  "seats": 4, "price": 5200,  "radio": true },
+    { "id": "V04", "name": "Ranchero",     "cls": "pickup",   "top_kmh": 150, "accel_0_100_s": 7.5, "grip": 0.80, "hp": 650,  "seats": 4, "price": 6800,  "radio": true },
+    { "id": "V11", "name": "Obelisco",     "cls": "armored",  "top_kmh": 140, "accel_0_100_s": 9.5, "grip": 0.75, "hp": 2000, "seats": 6, "price": 0,     "radio": true, "steal_heat": 3 },
+    { "id": "V12", "name": "Cosecha Bgy",  "cls": "buggy",    "top_kmh": 130, "accel_0_100_s": 6.5, "grip": 0.78, "hp": 500,  "seats": 2, "price": 0,     "radio": false }
   ]
 }

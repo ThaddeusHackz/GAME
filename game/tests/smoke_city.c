@@ -220,7 +220,7 @@ static void test_city_world(Game *g) {
     CHECK((roadc & 0xFF) < 90 && ((roadc >> 16) & 0xFF) < 90,
           "minimap: avenue cell painted asphalt-dark (%08X)", roadc);
 
-    CHECK(c->veh_count == 23, "8 parked + 15 traffic = 23 vehicles (%d)", c->veh_count);
+    CHECK(c->veh_count == 27, "12 parked + 15 traffic = 27 vehicles (%d)", c->veh_count);
     CHECK(c->traffic_n == 15, "traffic fleet is exactly 15 cars");
     CHECK(c->ped_count == 30, "30 pedestrians on the sidewalks");
     int loops_seen = 0;

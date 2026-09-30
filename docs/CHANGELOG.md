@@ -2,6 +2,8 @@
 
 
 
+## M22 — Vehicle roster: V03 Almuden van, V04 Ranchero pickup, V11 Obelisco armoured (hp 2000, steal heat 3), V12 Cosecha buggy; class body boxes + pickup bed; 12 parked cars; from 4★ every other response vehicle is an Obelisco; suite 21 (1133 checks). Boats/aircraft (V08–V10) NOT done
+
 ## M21 — Strongholds: MOLINO FORTRESS, REFINERIA LA HERRERIA, FARO VIEJO; walled layouts with towers + signature keeps, 3 garrison waves (4/6/8, officer-led finale), 6 s flag hold, +500 cash / +6 stature / 12g cache, save ids stronghold_1..3, bigger map icons; ST2 relocated to Isla Sombra (deviation); suite 20 (1083 checks)
 
 ## M20 — Camp network: 11 liberation camps (outposts 2..12) with 3 layouts, streamed tagged garrisons (3+difficulty, pool slot reuse), clear + hold flag 3 s, rewards, map/minimap icons, save ids camp_00..camp_10; Isla Sombra k/12; suite 19 (1063 checks)

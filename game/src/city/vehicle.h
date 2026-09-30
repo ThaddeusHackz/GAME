@@ -10,10 +10,11 @@
 #include "../core/dh_types.h"
 #include <stdint.h>
 
-#define VEH_DEFS_MAX 8
+#define VEH_DEFS_MAX 12
 #define VEHICLES_MAX 48
 
-typedef enum { VC_COMPACT, VC_MUSCLE, VC_TAXI, VC_POLICE, VC_MOTO, VC_COUNT } VehClass;
+typedef enum { VC_COMPACT, VC_MUSCLE, VC_TAXI, VC_POLICE, VC_MOTO,
+               VC_VAN, VC_PICKUP, VC_ARMORED, VC_BUGGY, VC_COUNT  /* M22 */ } VehClass;
 
 typedef struct {
     char id[8];

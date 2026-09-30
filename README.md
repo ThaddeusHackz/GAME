@@ -38,6 +38,7 @@ dependencies).
 | M19 | FINALE El Sereno: lantern gate (B1-B5), 3 cult waves, called-cut parry duel, 3-way offering (Tobias / ledger / silence) | 18 suites / 1038 checks |
 | M20 | Camp network: 11 more liberation camps (12/12 outposts), streamed garrisons, flag capture, saves + map icons | 19 suites / 1063 checks |
 | M21 | 3 multi-stage strongholds (3 waves each, 6 s hold, saves + map icons) | 20 suites / 1083 checks |
+| M22 | S69 land roster: +van, pickup, Limpio Obelisco armour, cult buggy (9 land classes; 4★ armoured response) | 21 suites / 1133 checks |
 
 A playable vertical slice exists: `dist/DividedHorizon.exe` boots into the island,
 and `--outpost` drops you at the Punta Quemada capture DoD. Every milestone is

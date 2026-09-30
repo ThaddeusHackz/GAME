@@ -6,11 +6,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void veh_body_(VehicleDef *d) {
+    switch (d->cls) {
+        case VC_MOTO:    d->width = 0.7f; d->length = 2.0f; d->height = 1.2f; break;
+        case VC_MUSCLE:  d->width = 1.9f; d->length = 4.7f; d->height = 1.35f; break;
+        case VC_VAN:     d->width = 2.0f; d->length = 5.0f; d->height = 2.2f; break;
+        case VC_PICKUP:  d->width = 1.95f; d->length = 5.2f; d->height = 1.7f; break;
+        case VC_ARMORED: d->width = 2.3f; d->length = 5.6f; d->height = 2.5f; break;
+        case VC_BUGGY:   d->width = 1.7f; d->length = 3.2f; d->height = 1.3f; break;
+        default:         d->width = 1.8f; d->length = 4.2f; d->height = 1.5f; break;
+    }
+}
+
+
 static VehClass cls_from_str(const char *s) {
     if (!strcmp(s, "muscle")) return VC_MUSCLE;
     if (!strcmp(s, "taxi")) return VC_TAXI;
     if (!strcmp(s, "police")) return VC_POLICE;
     if (!strcmp(s, "motorcycle")) return VC_MOTO;
+    if (!strcmp(s, "van")) return VC_VAN;
+    if (!strcmp(s, "pickup")) return VC_PICKUP;
+    if (!strcmp(s, "armored")) return VC_ARMORED;
+    if (!strcmp(s, "buggy")) return VC_BUGGY;
     return VC_COMPACT;
 }
 
@@ -23,6 +40,10 @@ static void vehicle_builtin(VehicleDef defs[VEH_DEFS_MAX], int *count) {
         {"V05", "Guagua",     "taxi",       135, 9.0f, 0.82f, 500, 4, 4000,  1, 1},
         {"V06", "Sirena",     "police",     180, 6.0f, 0.85f, 800, 4, 0,     2, 1},
         {"V07", "Fenix",      "motorcycle", 205, 4.2f, 0.90f, 300, 2, 9500,  1, 0},
+        {"V03", "Almuden",    "van",        120, 11.0f,0.75f, 700, 4, 5200,  1, 1},
+        {"V04", "Ranchero",   "pickup",     150, 7.5f, 0.80f, 650, 4, 6800,  1, 1},
+        {"V11", "Obelisco",   "armored",    140, 9.5f, 0.75f, 2000,6, 0,     3, 1},
+        {"V12", "Cosecha Bgy","buggy",      130, 6.5f, 0.78f, 500, 2, 0,     1, 0},
     };
     *count = 0;
     for (size_t i = 0; i < sizeof B / sizeof B[0]; i++) {
@@ -39,22 +60,12 @@ static void vehicle_builtin(VehicleDef defs[VEH_DEFS_MAX], int *count) {
         d->steal_heat = B[i].heat;
         d->radio = B[i].radio;
         d->accel_ms2 = (27.8f / B[i].t100) * 1.35f;
-        switch (d->cls) {
-            case VC_MOTO:   d->width = 0.7f; d->length = 2.0f; d->height = 1.2f; break;
-            case VC_MUSCLE: d->width = 1.9f; d->length = 4.7f; d->height = 1.35f; break;
-            default:        d->width = 1.8f; d->length = 4.2f; d->height = 1.5f; break;
-        }
+        veh_body_(d);
         (*count)++;
     }
 }
 
-static void veh_body(VehicleDef *d) {
-    switch (d->cls) {
-        case VC_MOTO:   d->width = 0.7f; d->length = 2.0f; d->height = 1.2f; break;
-        case VC_MUSCLE: d->width = 1.9f; d->length = 4.7f; d->height = 1.35f; break;
-        default:        d->width = 1.8f; d->length = 4.2f; d->height = 1.5f; break;
-    }
-}
+static void veh_body(VehicleDef *d) { veh_body_(d); }
 
 int vehicle_defs_load(VehicleDef defs[VEH_DEFS_MAX], const char *json_path) {
     char pathbuf[512];
